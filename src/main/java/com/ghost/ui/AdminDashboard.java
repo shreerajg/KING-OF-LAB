@@ -102,7 +102,7 @@ public class AdminDashboard {
         bgImg.setPreserveRatio(false);
         bgImg.fitWidthProperty().bind(rootStack.widthProperty());
         bgImg.fitHeightProperty().bind(rootStack.heightProperty());
-        bgImg.setOpacity(0.22); // subtle tinted bg
+        bgImg.setOpacity(0.55); // subtle tinted bg
         loadAdminBgImage(bgImg, adminTheme);
 
         // Main layout on top
@@ -479,8 +479,10 @@ public class AdminDashboard {
             VBox card = studentCards.get(student);
             if (card != null) {
                 FadeTransition flash = new FadeTransition(Duration.millis(200), card);
-                flash.setFromValue(0.5); flash.setToValue(1.0);
-                flash.setCycleCount(6); flash.setAutoReverse(true); flash.play();
+                flash.setFromValue(1.0); flash.setToValue(0.5);
+                flash.setCycleCount(6); flash.setAutoReverse(true);
+                flash.setOnFinished(e -> card.setOpacity(1.0));
+                flash.play();
             }
         }
     }
@@ -663,7 +665,7 @@ public class AdminDashboard {
                     java.net.URL url = AdminDashboard.class.getResource("/themes/" + t[2]);
                     if (url != null) {
                         bgImg.setImage(new Image(url.toString()));
-                        bgImg.setOpacity(0.22);
+                        bgImg.setOpacity(0.55);
                     } else {
                         bgImg.setImage(null);
                     }

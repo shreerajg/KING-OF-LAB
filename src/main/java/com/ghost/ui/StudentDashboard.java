@@ -116,12 +116,12 @@ public class StudentDashboard {
         bgImageView.fitWidthProperty().bind(root.widthProperty());
         bgImageView.fitHeightProperty().bind(root.heightProperty());
         // Slight blur so text reads comfortably over the image
-        bgImageView.setEffect(new GaussianBlur(5));
-        bgImageView.setOpacity(0.82);
+        bgImageView.setEffect(new GaussianBlur(2));
+        bgImageView.setOpacity(1.0);
 
         // Dark semi-transparent overlay so UI elements are clearly visible
         Region darkOverlay = new Region();
-        darkOverlay.setStyle("-fx-background-color: rgba(0,0,0,0.52);");
+        darkOverlay.setStyle("-fx-background-color: rgba(0,0,0,0.25);");
         darkOverlay.setMouseTransparent(true);
         darkOverlay.prefWidthProperty().bind(root.widthProperty());
         darkOverlay.prefHeightProperty().bind(root.heightProperty());
