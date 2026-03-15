@@ -41,6 +41,7 @@ public class GhostServer {
     private final Gson gson = new Gson();
     private ScreenUpdateListener screenListener;
     private ClientStatusListener statusListener;
+    private ExtendedListener extendedListener;
 
     // -----------------------------------------------------------------------
     // Listener interfaces
@@ -56,8 +57,16 @@ public class GhostServer {
         void onClientDisconnected(String clientName);
     }
 
-    public void setScreenListener(ScreenUpdateListener l) { this.screenListener = l; }
-    public void setStatusListener(ClientStatusListener l)  { this.statusListener = l; }
+    /**
+     * Extended listener for Phase 2 packet types: RAISE_HAND, POLL_ANSWER.
+     */
+    public interface ExtendedListener {
+        void onExtendedPacket(CommandPacket.Type type, String sender, String payload);
+    }
+
+    public void setScreenListener(ScreenUpdateListener l)    { this.screenListener    = l; }
+    public void setStatusListener(ClientStatusListener l)     { this.statusListener    = l; }
+    public void setExtendedListener(ExtendedListener l)       { this.extendedListener  = l; }
 
     // -----------------------------------------------------------------------
     // Start / Stop
@@ -231,6 +240,13 @@ public class GhostServer {
                 case MSG:
                     // Forward peer chat to all other students
                     broadcastExcept(packet, this);
+                    break;
+
+                case RAISE_HAND:
+                case POLL_ANSWER:
+                    // Forward to admin via extended listener
+                    if (extendedListener != null)
+                        extendedListener.onExtendedPacket(packet.getType(), clientName, packet.getPayload());
                     break;
 
                 default:

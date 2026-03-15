@@ -8,7 +8,7 @@ public class Config {
 
     // ===== AI CONFIGURATION =====
     // Admin can toggle this at runtime – volatile for cross-thread visibility
-    public static volatile boolean aiEnabled = true;
+    public static volatile boolean aiEnabled = false;
     public static final String OLLAMA_URL  = "http://localhost:11434";
     public static final String AI_MODEL    = "qwen2.5:7b"; // change to any installed Ollama model
     public static final int    AI_TIMEOUT_MS = 60_000;      // 60-second timeout for AI response
