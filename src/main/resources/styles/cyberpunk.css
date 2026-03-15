@@ -1,0 +1,103 @@
+/* Cyberpunk Theme - Ghost Application */
+
+.root {
+    -fx-font-family: 'Segoe UI', 'Roboto', sans-serif;
+}
+
+/* Buttons */
+.button {
+    -fx-background-color: linear-gradient(to bottom, #3a3a5a, #2a2a4a);
+    -fx-text-fill: #00ffaa;
+    -fx-border-color: #00ffaa;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-padding: 10 20;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0, 255, 170, 0.3), 10, 0, 0, 0);
+}
+
+.button:hover {
+    -fx-background-color: linear-gradient(to bottom, #4a4a6a, #3a3a5a);
+    -fx-effect: dropshadow(gaussian, rgba(0, 255, 170, 0.6), 15, 0, 0, 0);
+}
+
+.button:pressed {
+    -fx-background-color: #00ffaa;
+    -fx-text-fill: #1a1a2e;
+}
+
+/* Text Fields */
+.text-field,
+.text-area {
+    -fx-background-color: rgba(30, 30, 50, 0.8);
+    -fx-text-fill: #00ffaa;
+    -fx-prompt-text-fill: #555;
+    -fx-border-color: #3a3a5a;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-padding: 10;
+}
+
+.text-field:focused,
+.text-area:focused {
+    -fx-border-color: #00ffaa;
+    -fx-effect: dropshadow(gaussian, rgba(0, 255, 170, 0.4), 10, 0, 0, 0);
+}
+
+/* Labels */
+.label {
+    -fx-text-fill: #aaa;
+}
+
+/* Combo Box */
+.combo-box {
+    -fx-background-color: #2a2a4e;
+    -fx-border-color: #3a3a5a;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+}
+
+.combo-box .list-cell {
+    -fx-text-fill: white;
+    -fx-background-color: #2a2a4e;
+}
+
+.combo-box-popup .list-view {
+    -fx-background-color: #2a2a4e;
+}
+
+/* Scroll Pane */
+.scroll-pane {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+
+.scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+
+/* Toggle Button */
+.toggle-button {
+    -fx-background-color: #2ecc71;
+    -fx-text-fill: white;
+    -fx-background-radius: 15px;
+    -fx-padding: 8 16;
+}
+
+.toggle-button:selected {
+    -fx-background-color: #e74c3c;
+}
+
+/* Cards/Panels */
+.card {
+    -fx-background-color: rgba(255, 255, 255, 0.05);
+    -fx-background-radius: 15px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 15, 0, 0, 5);
+}
+
+/* Separator */
+.separator .line {
+    -fx-border-color: #3a3a5a;
+}

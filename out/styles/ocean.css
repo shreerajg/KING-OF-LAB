@@ -1,0 +1,90 @@
+/* Ocean Theme - Ghost Application */
+
+.root {
+    -fx-font-family: 'Segoe UI', 'Roboto', sans-serif;
+}
+
+/* Buttons */
+.button {
+    -fx-background-color: linear-gradient(to bottom, #0097a7, #00838f);
+    -fx-text-fill: white;
+    -fx-border-color: #00bcd4;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-padding: 10 20;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0, 188, 212, 0.3), 10, 0, 0, 0);
+}
+
+.button:hover {
+    -fx-background-color: linear-gradient(to bottom, #00acc1, #0097a7);
+    -fx-effect: dropshadow(gaussian, rgba(0, 188, 212, 0.6), 15, 0, 0, 0);
+}
+
+.button:pressed {
+    -fx-background-color: #00bcd4;
+    -fx-text-fill: #004d40;
+}
+
+/* Text Fields */
+.text-field,
+.text-area {
+    -fx-background-color: rgba(224, 247, 250, 0.9);
+    -fx-text-fill: #006064;
+    -fx-prompt-text-fill: #80cbc4;
+    -fx-border-color: #b2ebf2;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-padding: 10;
+}
+
+.text-field:focused,
+.text-area:focused {
+    -fx-border-color: #00bcd4;
+    -fx-effect: dropshadow(gaussian, rgba(0, 188, 212, 0.4), 10, 0, 0, 0);
+}
+
+/* Labels */
+.label {
+    -fx-text-fill: #006064;
+}
+
+/* Combo Box */
+.combo-box {
+    -fx-background-color: white;
+    -fx-border-color: #b2ebf2;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+}
+
+.combo-box .list-cell {
+    -fx-text-fill: #006064;
+    -fx-background-color: white;
+}
+
+/* Scroll Pane */
+.scroll-pane {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+
+/* Toggle Button */
+.toggle-button {
+    -fx-background-color: #26c6da;
+    -fx-text-fill: white;
+    -fx-background-radius: 15px;
+    -fx-padding: 8 16;
+}
+
+.toggle-button:selected {
+    -fx-background-color: #ef5350;
+}
+
+/* Cards */
+.card {
+    -fx-background-color: rgba(255, 255, 255, 0.9);
+    -fx-background-radius: 15px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 150, 167, 0.2), 15, 0, 0, 5);
+}
