@@ -114,6 +114,41 @@ public class ScreenCapture {
         }
     }
 
+    public static byte[] captureAsBytes(double resolutionScale, float jpegQuality) {
+        try {
+            BufferedImage capture = robot.createScreenCapture(screenRect);
+            int newW = (int) (capture.getWidth()  * resolutionScale);
+            int newH = (int) (capture.getHeight() * resolutionScale);
+
+            if (reusableBuffer == null || reusableBuffer.getWidth() != newW || reusableBuffer.getHeight() != newH) {
+                if (reusableGraphics != null) reusableGraphics.dispose();
+                reusableBuffer   = new BufferedImage(newW, newH, BufferedImage.TYPE_INT_RGB);
+                reusableGraphics = reusableBuffer.createGraphics();
+                reusableGraphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            }
+
+            reusableGraphics.drawImage(capture, 0, 0, newW, newH, null);
+            drawMouseCursor(reusableGraphics, resolutionScale, resolutionScale);
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream(50_000);
+            Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpg");
+            if (writers.hasNext()) {
+                ImageWriter writer = writers.next();
+                ImageWriteParam param = writer.getDefaultWriteParam();
+                param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+                param.setCompressionQuality(jpegQuality);
+                ImageOutputStream ios = ImageIO.createImageOutputStream(baos);
+                writer.setOutput(ios);
+                writer.write(null, new IIOImage(reusableBuffer, null, null), param);
+                writer.dispose();
+                ios.close();
+            }
+            return baos.toByteArray();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Streaming entry point (with delta detection)
     // -----------------------------------------------------------------------

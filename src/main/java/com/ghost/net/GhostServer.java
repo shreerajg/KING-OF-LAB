@@ -2,12 +2,13 @@ package com.ghost.net;
 
 import com.ghost.util.AuditLogger;
 import com.ghost.util.Config;
-import com.ghost.util.ScreenCapture;
 import com.google.gson.Gson;
 import java.io.*;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
+import javafx.application.Platform;
+import javafx.scene.image.Image;
 
 /**
  * King of Lab — upgraded GhostServer.
@@ -73,6 +74,7 @@ public class GhostServer {
     // -----------------------------------------------------------------------
 
     public void start() {
+        startBinaryStreamServer();
         new Thread(() -> {
             try {
                 serverSocket = new ServerSocket(Config.SERVER_PORT);
@@ -158,6 +160,55 @@ public class GhostServer {
 
     public List<String> getConnectedClients() { return new ArrayList<>(clientsByName.keySet()); }
     public int getClientCount()               { return clientsByName.size(); }
+
+    private void startBinaryStreamServer() {
+        new Thread(() -> {
+            int port = Config.SERVER_PORT + 1;
+            try (ServerSocket binarySocket = new ServerSocket(port)) {
+                AuditLogger.logSystem("Ultra-Binary Stream Server listening on port " + port);
+                while (running) {
+                    Socket client = binarySocket.accept();
+                    pool.execute(() -> handleBinaryStream(client));
+                }
+            } catch (IOException e) {
+                AuditLogger.logError("BinaryStreamServer", e.getMessage());
+            }
+        }, "KingServer-BinaryStream").start();
+    }
+
+    private void handleBinaryStream(Socket socket) {
+        try (DataInputStream dis = new DataInputStream(socket.getInputStream())) {
+            while (running && !socket.isClosed()) {
+                // Header: [Name Length (int)][Name (UTF)][Payload Length (int)][Payload (bytes)]
+                int nameLen = dis.readInt();
+                byte[] nameBytes = new byte[nameLen];
+                dis.readFully(nameBytes);
+                String studentName = new String(nameBytes);
+                
+                int payloadLen = dis.readInt();
+                byte[] payload = new byte[payloadLen];
+                dis.readFully(payload);
+                
+                // Directly convert JPEG bytes to Image and notify listener
+                Image image = new Image(new ByteArrayInputStream(payload));
+                // We use a custom update path to bypass Base64 decoding in the UI
+                Platform.runLater(() -> {
+                    if (screenListener instanceof BinaryScreenListener) {
+                        ((BinaryScreenListener) screenListener).onBinaryUpdate(studentName, image);
+                    }
+                });
+            }
+        } catch (EOFException ignored) {
+        } catch (Exception e) {
+            AuditLogger.logError("BinaryStream", e.getMessage());
+        } finally {
+            try { socket.close(); } catch (IOException ignored) {}
+        }
+    }
+
+    public interface BinaryScreenListener extends ScreenUpdateListener {
+        void onBinaryUpdate(String clientName, javafx.scene.image.Image image);
+    }
 
     // -----------------------------------------------------------------------
     // ClientHandler (inner class)

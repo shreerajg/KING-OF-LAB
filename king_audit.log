@@ -39,3 +39,183 @@
 [2026-03-17 01:55:58] [DISCONNECT] Student disconnected: shree
 [2026-03-17 02:23:53] [SYSTEM] King of Lab v3.0 started
 [2026-03-17 02:23:53] [SYSTEM] Database initialised
+[2026-03-17 02:24:13] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 02:24:13] [SYSTEM] Database initialised
+[2026-03-17 02:24:19] [LOGIN] admin logged in successfully
+[2026-03-17 02:24:19] [SYSTEM] King of Lab Admin started
+[2026-03-17 02:24:19] [SYSTEM] King Server listening on port 5555
+[2026-03-17 02:25:39] [SYSTEM] Stream Mode switched to ULTRA_WEBRTC
+[2026-03-17 02:25:42] [SYSTEM] Stream Mode switched to LEGACY_CPU
+[2026-03-17 02:25:53] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 02:25:53] [SYSTEM] Database initialised
+[2026-03-17 02:25:59] [LOGIN] shree logged in successfully
+[2026-03-17 02:26:01] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-17 02:26:01] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-17 02:26:01] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-17 02:27:33] [COMMAND] admin → ALL: AI_TOGGLE → ENABLE
+[2026-03-17 02:27:33] [SYSTEM] AI ENABLED by admin
+[2026-03-17 02:27:37] [COMMAND] admin → ALL: AI_TOGGLE → DISABLE
+[2026-03-17 02:27:37] [SYSTEM] AI DISABLED by admin
+[2026-03-17 02:27:43] [SYSTEM] Cleared all AI conversation histories
+[2026-03-17 02:27:43] [COMMAND] admin → ALL: AI_CLEAR_HISTORY
+[2026-03-17 02:27:43] [SYSTEM] Cleared AI conversation history for: shree
+[2026-03-17 02:28:01] [COMMAND] admin → ALL: AI_TOGGLE → ENABLE
+[2026-03-17 02:28:01] [SYSTEM] AI ENABLED by admin
+[2026-03-17 02:28:06] [AI_QUERY] shree asked: hi
+[2026-03-17 02:28:06] [ERROR] [OllamaService] Connection refused: getsockopt
+[2026-03-17 02:34:50] [DISCONNECT] Student disconnected: shree
+[2026-03-17 02:42:31] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 02:42:31] [SYSTEM] Database initialised
+[2026-03-17 02:42:36] [LOGIN] admin logged in successfully
+[2026-03-17 02:42:36] [SYSTEM] King of Lab Admin started
+[2026-03-17 02:42:36] [SYSTEM] King Server listening on port 5555
+[2026-03-17 02:42:49] [COMMAND] admin → ALL: AI_TOGGLE → ENABLE
+[2026-03-17 02:42:52] [COMMAND] admin → ALL: AI_TOGGLE → DISABLE
+[2026-03-17 02:42:58] [SYSTEM] Cleared all AI conversation histories
+[2026-03-17 02:42:58] [COMMAND] admin → ALL: AI_CLEAR_HISTORY
+[2026-03-17 02:43:00] [SYSTEM] Cleared all AI conversation histories
+[2026-03-17 02:43:00] [COMMAND] admin → ALL: AI_CLEAR_HISTORY
+[2026-03-17 02:43:27] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 02:43:27] [SYSTEM] Database initialised
+[2026-03-17 02:43:30] [LOGIN] shree logged in successfully
+[2026-03-17 02:43:32] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-17 02:43:32] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-17 02:43:32] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-17 02:45:13] [ERROR] [ScreenCapture] Cannot invoke "java.io.PrintWriter.println(String)" because "this.out" is null
+[2026-03-17 02:45:45] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 02:45:45] [SYSTEM] Database initialised
+[2026-03-17 02:45:48] [LOGIN] admin LOGIN FAILED
+[2026-03-17 02:45:52] [LOGIN] admin logged in successfully
+[2026-03-17 02:45:52] [SYSTEM] King of Lab Admin started
+[2026-03-17 02:45:52] [SYSTEM] King Server listening on port 5555
+[2026-03-17 02:46:14] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 02:46:14] [SYSTEM] Database initialised
+[2026-03-17 02:46:18] [LOGIN] shree logged in successfully
+[2026-03-17 02:46:18] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-17 02:46:18] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-17 02:46:19] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-17 02:47:05] [COMMAND] admin → ALL: BLOCK INTERNET
+[2026-03-17 02:47:11] [COMMAND] admin → ALL: RESTORE
+[2026-03-17 02:47:18] [COMMAND] admin → ALL: AI_TOGGLE → ENABLE
+[2026-03-17 02:47:18] [SYSTEM] AI ENABLED by admin
+[2026-03-17 02:47:20] [COMMAND] admin → ALL: AI_TOGGLE → DISABLE
+[2026-03-17 02:47:20] [SYSTEM] AI DISABLED by admin
+[2026-03-17 02:47:54] [DISCONNECT] Student disconnected: shree
+[2026-03-17 02:49:52] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 02:49:52] [SYSTEM] Database initialised
+[2026-03-17 02:49:56] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 02:49:56] [SYSTEM] Database initialised
+[2026-03-17 02:50:02] [LOGIN] admin logged in successfully
+[2026-03-17 02:50:02] [SYSTEM] King of Lab Admin started
+[2026-03-17 02:50:02] [SYSTEM] King Server listening on port 5555
+[2026-03-17 02:50:10] [LOGIN] shree logged in successfully
+[2026-03-17 02:50:12] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-17 02:50:12] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-17 02:50:12] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-17 02:52:04] [ERROR] [ScreenCapture] Cannot invoke "java.io.PrintWriter.println(String)" because "this.out" is null
+[2026-03-17 02:53:27] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 02:53:27] [SYSTEM] Database initialised
+[2026-03-17 02:53:31] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 02:53:31] [SYSTEM] Database initialised
+[2026-03-17 02:53:36] [LOGIN] admin logged in successfully
+[2026-03-17 02:53:36] [SYSTEM] King of Lab Admin started
+[2026-03-17 02:53:36] [SYSTEM] King Server listening on port 5555
+[2026-03-17 02:53:45] [LOGIN] shree logged in successfully
+[2026-03-17 02:53:46] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-17 02:53:46] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-17 02:53:46] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-17 02:58:33] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 02:58:33] [SYSTEM] Database initialised
+[2026-03-17 02:58:38] [LOGIN] admin logged in successfully
+[2026-03-17 02:58:38] [SYSTEM] King of Lab Admin started
+[2026-03-17 02:58:38] [SYSTEM] King Server listening on port 5555
+[2026-03-17 02:58:48] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 02:58:48] [SYSTEM] Database initialised
+[2026-03-17 02:58:52] [LOGIN] shree logged in successfully
+[2026-03-17 02:58:54] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-17 02:58:54] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-17 02:58:54] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-17 02:59:28] [SYSTEM] Stream Mode switched to ULTRA_WEBRTC
+[2026-03-17 02:59:28] [SYSTEM] Switching Stream Mode to: ULTRA_WEBRTC
+[2026-03-17 02:59:55] [SYSTEM] Stream Mode switched to LEGACY_CPU
+[2026-03-17 02:59:55] [SYSTEM] Switching Stream Mode to: LEGACY_CPU
+[2026-03-17 03:01:12] [DISCONNECT] Student disconnected: shree
+[2026-03-17 03:05:15] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 03:05:15] [SYSTEM] Database initialised
+[2026-03-17 03:05:19] [LOGIN] admin LOGIN FAILED
+[2026-03-17 03:05:24] [LOGIN] admin logged in successfully
+[2026-03-17 03:05:24] [SYSTEM] King of Lab Admin started
+[2026-03-17 03:05:24] [SYSTEM] King Server listening on port 5555
+[2026-03-17 03:05:24] [SYSTEM] Ultra-Binary Stream Server listening on port 5556
+[2026-03-17 03:05:41] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 03:05:41] [SYSTEM] Database initialised
+[2026-03-17 03:05:44] [LOGIN] shree logged in successfully
+[2026-03-17 03:05:45] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-17 03:05:45] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-17 03:05:45] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-17 03:06:26] [SYSTEM] Stream Mode switched to ULTRA_WEBRTC
+[2026-03-17 03:06:26] [SYSTEM] Switching Stream Mode to: ULTRA_WEBRTC
+[2026-03-17 03:06:54] [SYSTEM] Stream Mode switched to LEGACY_CPU
+[2026-03-17 03:06:54] [SYSTEM] Switching Stream Mode to: LEGACY_CPU
+[2026-03-17 03:06:54] [ERROR] [UltraStream] Cannot enter synchronized block because "this.bOut" is null
+[2026-03-17 03:07:07] [ERROR] [ScreenCapture] Cannot invoke "java.io.PrintWriter.println(String)" because "this.out" is null
+[2026-03-17 03:07:32] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 03:07:32] [SYSTEM] Database initialised
+[2026-03-17 03:07:41] [LOGIN] admin logged in successfully
+[2026-03-17 03:07:41] [SYSTEM] King of Lab Admin started
+[2026-03-17 03:07:41] [SYSTEM] King Server listening on port 5555
+[2026-03-17 03:07:41] [SYSTEM] Ultra-Binary Stream Server listening on port 5556
+[2026-03-17 03:07:52] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-17 03:07:52] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-17 03:08:00] [ERROR] [ScreenCapture] Cannot invoke "java.io.PrintWriter.println(String)" because "this.out" is null
+[2026-03-17 03:08:13] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 03:08:13] [SYSTEM] Database initialised
+[2026-03-17 03:08:19] [LOGIN] admin logged in successfully
+[2026-03-17 03:08:19] [SYSTEM] King of Lab Admin started
+[2026-03-17 03:08:19] [SYSTEM] King Server listening on port 5555
+[2026-03-17 03:08:19] [SYSTEM] Ultra-Binary Stream Server listening on port 5556
+[2026-03-17 03:08:21] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-17 03:08:21] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-17 03:09:47] [ERROR] [ScreenCapture] Cannot invoke "java.io.PrintWriter.println(String)" because "this.out" is null
+[2026-03-17 03:11:18] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 03:11:18] [SYSTEM] Database initialised
+[2026-03-17 03:11:33] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 03:11:33] [SYSTEM] Database initialised
+[2026-03-17 03:11:39] [LOGIN] shree logged in successfully
+[2026-03-17 03:11:49] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 03:11:49] [SYSTEM] Database initialised
+[2026-03-17 03:11:54] [LOGIN] admin logged in successfully
+[2026-03-17 03:11:54] [SYSTEM] King of Lab Admin started
+[2026-03-17 03:11:54] [SYSTEM] King Server listening on port 5555
+[2026-03-17 03:11:54] [SYSTEM] Ultra-Binary Stream Server listening on port 5556
+[2026-03-17 03:11:54] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-17 03:11:54] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-17 03:11:54] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-17 03:11:59] [SYSTEM] Switching Stream Mode to: ULTRA_WEBRTC
+[2026-03-17 03:11:59] [SYSTEM] Stream Mode switched to ULTRA_WEBRTC
+[2026-03-17 03:12:04] [SYSTEM] Switching Stream Mode to: LEGACY_CPU
+[2026-03-17 03:12:05] [SYSTEM] Stream Mode switched to LEGACY_CPU
+[2026-03-17 03:12:05] [ERROR] [UltraStream] Cannot enter synchronized block because "this.bOut" is null
+[2026-03-17 03:12:20] [SYSTEM] Switching Stream Mode to: ULTRA_WEBRTC
+[2026-03-17 03:12:20] [SYSTEM] Stream Mode switched to ULTRA_WEBRTC
+[2026-03-17 03:12:30] [SYSTEM] Switching Stream Mode to: LEGACY_CPU
+[2026-03-17 03:12:30] [SYSTEM] Stream Mode switched to LEGACY_CPU
+[2026-03-17 03:13:14] [ERROR] [ScreenCapture] Cannot invoke "java.io.PrintWriter.println(String)" because "this.out" is null
+[2026-03-17 03:14:37] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 03:14:37] [SYSTEM] Database initialised
+[2026-03-17 03:14:47] [LOGIN] admin logged in successfully
+[2026-03-17 03:14:47] [SYSTEM] King of Lab Admin started
+[2026-03-17 03:14:47] [SYSTEM] King Server listening on port 5555
+[2026-03-17 03:14:47] [SYSTEM] Ultra-Binary Stream Server listening on port 5556
+[2026-03-17 03:15:11] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 03:15:11] [SYSTEM] Database initialised
+[2026-03-17 03:15:15] [LOGIN] shree logged in successfully
+[2026-03-17 03:15:16] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-17 03:15:16] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-17 03:15:16] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-17 03:15:44] [SYSTEM] Switching Stream Mode to: ULTRA_WEBRTC
+[2026-03-17 03:15:44] [SYSTEM] Stream Mode switched to ULTRA_WEBRTC
+[2026-03-17 03:16:19] [SYSTEM] Stream Mode switched to LEGACY_CPU
+[2026-03-17 03:16:19] [SYSTEM] Switching Stream Mode to: LEGACY_CPU
+[2026-03-17 03:16:19] [ERROR] [UltraStream] Cannot enter synchronized block because "this.bOut" is null
+[2026-03-17 03:18:15] [ERROR] [ScreenCapture] Cannot invoke "java.io.PrintWriter.println(String)" because "this.out" is null
