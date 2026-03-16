@@ -12,6 +12,13 @@ import java.io.*;
 import java.net.*;
 import java.util.concurrent.*;
 
+import com.ghost.streaming.api.StreamMode;
+import com.ghost.streaming.api.ScreenCapturer;
+import com.ghost.streaming.api.VideoEncoder;
+import com.ghost.streaming.webrtc.WebRtcClient;
+import com.ghost.streaming.webrtc.DxgiCapturer;
+import com.ghost.streaming.webrtc.NvidiaEncoder;
+
 /**
  * King of Lab — upgraded GhostClient.
  *
@@ -38,6 +45,12 @@ public class GhostClient {
 
     private volatile boolean sendingScreens = true;
     private volatile boolean running        = true;
+
+    // WebRTC Upgrade State
+    private StreamMode currentMode = StreamMode.LEGACY_CPU;
+    private WebRtcClient webRtcClient;
+    private ScreenCapturer ultraCapturer;
+    private VideoEncoder ultraEncoder;
 
     // Reconnect back-off state
     private int reconnectDelay = 3; // seconds, doubles each failure up to 30
@@ -141,6 +154,11 @@ public class GhostClient {
     // -----------------------------------------------------------------------
 
     private void startScreenCapture() {
+        if (currentMode == StreamMode.ULTRA_WEBRTC) {
+            startUltraWebRtc();
+            return;
+        }
+
         if (screenScheduler != null && !screenScheduler.isShutdown()) return;
 
         screenScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -181,9 +199,51 @@ public class GhostClient {
     }
 
     private void stopScreenCapture() {
+        if (webRtcClient != null) {
+            webRtcClient.stopStreaming();
+            webRtcClient = null;
+        }
         if (screenScheduler != null) {
             screenScheduler.shutdownNow();
             screenScheduler = null;
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Ultra Low Latency Pipeline
+    // -----------------------------------------------------------------------
+
+    private void startUltraWebRtc() {
+        System.out.println("[WebRTC] Starting Ultra Low Latency Pipeline...");
+        try {
+            if (webRtcClient == null) {
+                webRtcClient = new WebRtcClient();
+                webRtcClient.initializeContext();
+            }
+            
+            // Initialization with Fallback hierarchy
+            if (ultraCapturer == null) {
+                ultraCapturer = new DxgiCapturer();
+                if (!ultraCapturer.isSupported()) {
+                    System.out.println("[WebRTC] DXGI not supported, fallback omitted for scaffolding");
+                }
+            }
+
+            if (ultraEncoder == null) {
+                ultraEncoder = new NvidiaEncoder();
+                if (!ultraEncoder.isSupported()) {
+                    System.out.println("[WebRTC] NVENC not supported, fallback omitted for scaffolding");
+                }
+            }
+
+            webRtcClient.startStreaming(adminIp, Config.SERVER_PORT + 1, ultraCapturer, ultraEncoder);
+            ultraCapturer.startCapture();
+        } catch (Exception e) {
+            AuditLogger.logError("WebRTC", "Failed to start WebRTC: " + e.getMessage());
+            // Fallback to Legacy
+            System.out.println("[WebRTC] Falling back to LEGACY_CPU");
+            currentMode = StreamMode.LEGACY_CPU;
+            startScreenCapture();
         }
     }
 
@@ -256,6 +316,15 @@ public class GhostClient {
                 case AI_TOGGLE:
                     Config.aiEnabled = "ENABLE".equals(packet.getPayload());
                     AuditLogger.logSystem("AI " + (Config.aiEnabled ? "ENABLED" : "DISABLED") + " by admin");
+                    break;
+                case STREAM_MODE:
+                    StreamMode newMode = StreamMode.valueOf(packet.getPayload());
+                    if (currentMode != newMode) {
+                        AuditLogger.logSystem("Switching Stream Mode to: " + newMode);
+                        stopScreenCapture();
+                        currentMode = newMode;
+                        startScreenCapture();
+                    }
                     break;
                 default:
                     break;

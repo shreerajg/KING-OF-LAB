@@ -210,6 +210,20 @@ public class AdminDashboard {
         // ─── SCREEN SHARE ────────────────────────────────────────────────────
         VBox shareBox = buildShareSection();
 
+        // ─── STREAM MODE (WebRTC Upgrade) ────────────────────────────────────
+        ComboBox<String> streamModeBox = new ComboBox<>();
+        streamModeBox.getItems().addAll("LEGACY_CPU", "ULTRA_WEBRTC");
+        streamModeBox.setValue("LEGACY_CPU");
+        streamModeBox.setMaxWidth(Double.MAX_VALUE);
+        streamModeBox.setStyle("-fx-background-color: rgba(255,255,255,0.08); -fx-font-size: 11px;");
+        streamModeBox.setOnAction(e -> {
+            String mode = streamModeBox.getValue();
+            server.broadcast(new CommandPacket(CommandPacket.Type.STREAM_MODE, "ADMIN", mode));
+            appendChat("[SYSTEM]: Stream Mode switched to " + mode + " for all connected clients.");
+            AuditLogger.logSystem("Stream Mode switched to " + mode);
+        });
+        VBox streamModeSection = sectionBox("📡 STREAM PIPELINE", streamModeBox);
+
         // ─── TOOLS ───────────────────────────────────────────────────────────
         VBox tools = sectionBox("🔧 QUICK TOOLS",
                 wideBtn("📸 Screenshot All",   "#d35400", () -> captureAllScreenshots(stage)),
@@ -236,7 +250,7 @@ public class AdminDashboard {
         });
         VBox themeSection = sectionBox("🎨 THEME", themeBox);
 
-        sections.getChildren().addAll(classCtrl, internet, power, aiCtrl, shareBox, tools, themeSection);
+        sections.getChildren().addAll(classCtrl, internet, power, aiCtrl, shareBox, streamModeSection, tools, themeSection);
 
         ScrollPane scroll = new ScrollPane(sections);
         scroll.setFitToWidth(true);
@@ -485,6 +499,18 @@ public class AdminDashboard {
                 flash.play();
             }
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // WebRTC / Lazy Rendering Scaffold
+    // -----------------------------------------------------------------------
+
+    public static void checkThumbnailVisibility() {
+        // Scaffold for Lazy Rendering
+        // If the StreamMode is ULTRA_WEBRTC, iterate through studentCards
+        // If a card is outside the ScrollPane viewport, send a signal to pause
+        // or lower the FPS of its specific WebRTC receiver track.
+        // e.g.: webRtcServer.setTrackFramerate(name, 5); // Background FPS
     }
 
     private static void updateStudentScreen(String name, String base64) {

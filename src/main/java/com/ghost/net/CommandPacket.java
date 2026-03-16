@@ -12,6 +12,7 @@ public class CommandPacket {
         AI_TOGGLE,     // "ENABLE" | "DISABLE"
         FOCUS_REQUEST,
         PERF_STATS,
+        STREAM_MODE,   // "LEGACY_CPU" | "ULTRA_WEBRTC"
 
         // Phase 2 — New features
         RAISE_HAND,    // Student → Server: raise/lower hand (payload: "UP" | "DOWN")
