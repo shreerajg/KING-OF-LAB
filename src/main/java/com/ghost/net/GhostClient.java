@@ -13,6 +13,11 @@ import java.net.*;
 import java.util.concurrent.*;
 
 import com.ghost.streaming.api.StreamMode;
+import com.ghost.streaming.api.ScreenCapturer;
+import com.ghost.streaming.api.VideoEncoder;
+import com.ghost.streaming.webrtc.WebRtcClient;
+import com.ghost.streaming.webrtc.DxgiCapturer;
+import com.ghost.streaming.webrtc.NvidiaEncoder;
 
 /**
  * King of Lab — upgraded GhostClient.
@@ -41,8 +46,11 @@ public class GhostClient {
     private volatile boolean sendingScreens = true;
     private volatile boolean running        = true;
 
-    // Ultra Stream State
+    // WebRTC Upgrade State
     private StreamMode currentMode = StreamMode.LEGACY_CPU;
+    private WebRtcClient webRtcClient;
+    private ScreenCapturer ultraCapturer;
+    private VideoEncoder ultraEncoder;
 
     // Reconnect back-off state
     private int reconnectDelay = 3; // seconds, doubles each failure up to 30
@@ -138,7 +146,7 @@ public class GhostClient {
                 studentUser.getDivision());
         CommandPacket verify = new CommandPacket(
                 CommandPacket.Type.CONNECT, studentUser.getUsername(), studentInfo);
-        out.println(gson.toJson(verify));
+        if (out != null) out.println(gson.toJson(verify));
     }
 
     // -----------------------------------------------------------------------
@@ -179,7 +187,7 @@ public class GhostClient {
                             CommandPacket.Type.SCREEN_DATA,
                             studentUser.getUsername(),
                             base64);
-                    out.println(gson.toJson(pkt));
+                    if (out != null) out.println(gson.toJson(pkt));
                     PerformanceMonitor.recordFrame();
                 }
             } catch (Exception e) {

@@ -45,7 +45,7 @@ public class AdminDashboard {
     private static Label  studentCountLabel;
     private static Label  connectedLabel;
     private static Label  aiStatusLabel;
-    private static Button ultraStreamBtn;
+    private static Button ultraWebRtcBtn;
     private static boolean isUltraActive = false;
     private static boolean isSharingScreen = false;
     private static Button  shareScreenBtn;
@@ -246,7 +246,7 @@ public class AdminDashboard {
                 ribbonBtn("🤖 Toggle AI", ACCENT_COLOR, () -> toggleAi(user.getUsername()))
             ),
             buildCmdGroup("PIPELINE", 
-                ribbonBtn("🚄 Ultra Stream: OFF", PRIMARY_COLOR, () -> toggleUltraStream())
+                ribbonBtn("🚄 Ultra WebRTC: OFF", PRIMARY_COLOR, () -> toggleUltraStream())
             ),
             buildCmdGroup("TOOLS", 
                 ribbonBtn("📸 Screenshot", ACCENT_COLOR,  () -> captureAllScreenshots(stage)),
@@ -299,7 +299,7 @@ public class AdminDashboard {
         btn.setOnAction(e -> { action.run(); appendActivity("COMMAND", "Executed: " + text); });
         
         if (text.contains("Toggle AI")) aiToggleBtn = btn;
-        if (text.contains("Ultra Stream")) ultraStreamBtn = btn;
+        if (text.contains("Ultra WebRTC")) ultraWebRtcBtn = btn;
         if (text.contains("Share Screen")) shareScreenBtn = btn;
         
         return btn;
@@ -346,12 +346,12 @@ public class AdminDashboard {
         String mode = isUltraActive ? "ULTRA_WEBRTC" : "LEGACY_CPU";
         server.broadcast(new CommandPacket(CommandPacket.Type.STREAM_MODE, "ADMIN", mode));
         
-        if (ultraStreamBtn != null) {
-            ultraStreamBtn.setText(isUltraActive ? "🚄 Ultra Stream: ON" : "🚄 Ultra Stream: OFF");
-            ultraStreamBtn.setStyle(ultraStreamBtn.getStyle() + "-fx-border-color: " + (isUltraActive ? SUCCESS_COLOR : DANGER_COLOR) + ";");
+        if (ultraWebRtcBtn != null) {
+            ultraWebRtcBtn.setText(isUltraActive ? "🚄 WebRTC: ON" : "🚄 WebRTC: OFF");
+            ultraWebRtcBtn.setStyle(ultraWebRtcBtn.getStyle() + "-fx-border-color: " + (isUltraActive ? SUCCESS_COLOR : DANGER_COLOR) + ";");
         }
         
-        appendActivity("PIPELINE", "Stream Mode set to " + mode);
+        appendActivity("PIPELINE", "Mode switched to " + mode);
         AuditLogger.logSystem("Stream Mode switched to " + mode);
     }
 

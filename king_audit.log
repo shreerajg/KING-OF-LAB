@@ -219,3 +219,30 @@
 [2026-03-17 03:16:19] [SYSTEM] Switching Stream Mode to: LEGACY_CPU
 [2026-03-17 03:16:19] [ERROR] [UltraStream] Cannot enter synchronized block because "this.bOut" is null
 [2026-03-17 03:18:15] [ERROR] [ScreenCapture] Cannot invoke "java.io.PrintWriter.println(String)" because "this.out" is null
+[2026-03-17 03:24:59] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 03:24:59] [SYSTEM] Database initialised
+[2026-03-17 03:25:05] [LOGIN] admin logged in successfully
+[2026-03-17 03:25:05] [SYSTEM] King of Lab Admin started
+[2026-03-17 03:25:05] [SYSTEM] King Server listening on port 5555
+[2026-03-17 03:25:05] [SYSTEM] Ultra-Binary Stream Server listening on port 5556
+[2026-03-17 03:25:26] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 03:25:26] [SYSTEM] Database initialised
+[2026-03-17 03:25:30] [LOGIN] shree logged in successfully
+[2026-03-17 03:25:31] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-17 03:25:31] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-17 03:25:31] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-17 03:25:47] [SYSTEM] Stream Mode switched to ULTRA_WEBRTC
+[2026-03-17 03:25:47] [SYSTEM] Switching Stream Mode to: ULTRA_WEBRTC
+[2026-03-17 03:25:57] [SYSTEM] Switching Stream Mode to: LEGACY_CPU
+[2026-03-17 03:25:57] [SYSTEM] Stream Mode switched to LEGACY_CPU
+[2026-03-17 03:26:28] [SYSTEM] Switching Stream Mode to: ULTRA_WEBRTC
+[2026-03-17 03:26:28] [SYSTEM] Stream Mode switched to ULTRA_WEBRTC
+[2026-03-17 03:26:49] [SYSTEM] Switching Stream Mode to: LEGACY_CPU
+[2026-03-17 03:26:49] [SYSTEM] Stream Mode switched to LEGACY_CPU
+[2026-03-17 03:27:18] [COMMAND] admin → ALL: AI_TOGGLE → ENABLE
+[2026-03-17 03:27:18] [SYSTEM] AI ENABLED by admin
+[2026-03-17 03:27:26] [COMMAND] admin → ALL: AI_TOGGLE → DISABLE
+[2026-03-17 03:27:26] [SYSTEM] AI DISABLED by admin
+[2026-03-17 03:27:44] [COMMAND] admin → ALL: OPEN_URL: https://github.com/shreeraj
+[2026-03-17 03:28:10] [COMMAND] admin → ALL: OPEN_URL: https://github.com/shreerajg
+[2026-03-17 03:28:36] [DISCONNECT] Student disconnected: shree
