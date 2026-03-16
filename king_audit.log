@@ -25,3 +25,17 @@
 [2026-03-16 13:58:31] [SYSTEM] Stream Mode switched to LEGACY_CPU
 [2026-03-16 13:58:51] [COMMAND] admin → ALL: UNLOCK ALL
 [2026-03-16 13:59:27] [DISCONNECT] Student disconnected: shree
+[2026-03-17 01:53:43] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 01:53:43] [SYSTEM] Database initialised
+[2026-03-17 01:53:52] [LOGIN] admin logged in successfully
+[2026-03-17 01:53:52] [SYSTEM] King of Lab Admin started
+[2026-03-17 01:53:52] [SYSTEM] King Server listening on port 5555
+[2026-03-17 01:54:44] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 01:54:44] [SYSTEM] Database initialised
+[2026-03-17 01:54:51] [LOGIN] shree logged in successfully
+[2026-03-17 01:54:53] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-17 01:54:53] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-17 01:54:53] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-17 01:55:58] [DISCONNECT] Student disconnected: shree
+[2026-03-17 02:23:53] [SYSTEM] King of Lab v3.0 started
+[2026-03-17 02:23:53] [SYSTEM] Database initialised
