@@ -44,7 +44,7 @@ public class AttendanceTracker {
         }
 
         // Create attendance directory
-        File attendanceDir = new File(System.getProperty("user.home"), "Ghost Attendance");
+        File attendanceDir = new File(System.getProperty("user.home"), "King Attendance");
         attendanceDir.mkdirs();
 
         String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));

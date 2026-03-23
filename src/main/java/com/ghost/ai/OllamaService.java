@@ -87,8 +87,105 @@ public class OllamaService {
     }
 
     /**
+     * Ensures Ollama is installed and running on this machine.
+     * Steps:
+     *  1. If already available → return immediately.
+     *  2. Try launching "ollama serve" (installed but not running).
+     *  3. If still unavailable → install via winget, then start serve.
+     *  4. Pull the configured AI model if not already present.
+     *
+     * statusCallback receives human-readable progress messages (runs off UI thread).
+     */
+    public static void ensureOllamaRunning(Consumer<String> statusCallback) {
+        if (isAvailable()) return; // Already up
+
+        notify(statusCallback, "🔍 Ollama not detected — attempting to start...");
+
+        // Step 1: Try starting existing install
+        try {
+            ProcessBuilder startPb = new ProcessBuilder("cmd.exe", "/c", "start /b ollama serve");
+            startPb.redirectErrorStream(true);
+            startPb.start();
+            Thread.sleep(4000); // give it time to start
+        } catch (Exception ignored) {}
+
+        if (isAvailable()) {
+            notify(statusCallback, "✅ Ollama started! Loading model...");
+            pullModel(statusCallback);
+            return;
+        }
+
+        // Step 2: Not installed — try winget
+        notify(statusCallback, "📦 Installing Ollama via winget (one-time setup)...");
+        try {
+            ProcessBuilder installPb = new ProcessBuilder(
+                    "cmd.exe", "/c",
+                    "winget install Ollama.Ollama -e --accept-package-agreements --accept-source-agreements --silent");
+            installPb.redirectErrorStream(true);
+            Process p = installPb.start();
+
+            // Stream install output for visibility
+            try (java.io.BufferedReader br = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(p.getInputStream()))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    final String l = line.trim();
+                    if (!l.isEmpty()) notify(statusCallback, "  " + l);
+                }
+            }
+            p.waitFor();
+        } catch (Exception e) {
+            notify(statusCallback, "❌ winget install failed: " + e.getMessage() +
+                    "\nPlease install Ollama manually from https://ollama.com/download");
+            return;
+        }
+
+        // Step 3: Start freshly installed Ollama
+        notify(statusCallback, "🚀 Starting Ollama service...");
+        try {
+            new ProcessBuilder("cmd.exe", "/c", "start /b ollama serve")
+                    .redirectErrorStream(true).start();
+            Thread.sleep(5000);
+        } catch (Exception ignored) {}
+
+        if (!isAvailable()) {
+            notify(statusCallback, "❌ Could not start Ollama after install. Please restart your PC and try again.");
+            return;
+        }
+
+        notify(statusCallback, "✅ Ollama is running! Pulling AI model...");
+        pullModel(statusCallback);
+    }
+
+    /** Pulls the configured AI model if not already available. */
+    private static void pullModel(Consumer<String> statusCallback) {
+        notify(statusCallback, "⬇️ Downloading model: " + Config.AI_MODEL + " (first-time only, may take a few minutes)...");
+        try {
+            ProcessBuilder pb = new ProcessBuilder("cmd.exe", "/c", "ollama pull " + Config.AI_MODEL);
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            try (java.io.BufferedReader br = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(p.getInputStream()))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    final String l = line.trim();
+                    if (!l.isEmpty()) notify(statusCallback, "  " + l);
+                }
+            }
+            p.waitFor();
+            notify(statusCallback, "✅ Model ready! Sending your question now...");
+        } catch (Exception e) {
+            notify(statusCallback, "⚠️ Could not pull model automatically: " + e.getMessage());
+        }
+    }
+
+    private static void notify(Consumer<String> cb, String msg) {
+        if (cb != null) cb.accept(msg);
+    }
+
+    /**
      * Send a question to Ollama and receive the response asynchronously.
-     * Conversation history is maintained per-student across multiple calls.
+     * Automatically installs/starts Ollama if it is not running.
      * Callback runs on a background thread — use Platform.runLater() for UI updates.
      */
     public static void askAsync(String studentName, String question, Consumer<String> callback) {
@@ -104,6 +201,13 @@ public class OllamaService {
 
         Thread aiThread = new Thread(() -> {
             try {
+                // Auto-start / install Ollama if needed — status goes to UI via callback
+                if (!isAvailable()) {
+                    ensureOllamaRunning(msg -> {
+                        if (callback != null) callback.accept("[SYSTEM]: " + msg);
+                    });
+                }
+
                 // Get or create conversation history for this student
                 List<ChatMessage> history = conversationHistories
                         .computeIfAbsent(studentName, k -> new ArrayList<>());
@@ -127,9 +231,9 @@ public class OllamaService {
             } catch (Exception e) {
                 AuditLogger.logError("OllamaService", e.getMessage());
                 if (callback != null)
-                    callback.accept("❌ Could not reach KING AI. Make sure Ollama is running.\n" +
-                            "• Run: ollama serve\n" +
-                            "• Check model is pulled: ollama pull " + Config.AI_MODEL);
+                    callback.accept("❌ Could not reach KING AI.\n" +
+                            "• Try: ollama serve\n" +
+                            "• Check model: ollama pull " + Config.AI_MODEL);
             } finally {
                 AdaptiveStreamController.setAiProcessing(false);
             }

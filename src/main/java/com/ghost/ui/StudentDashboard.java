@@ -575,18 +575,32 @@ public class StudentDashboard {
         }
 
         aiChatArea.appendText("🧑 " + q + "\n");
-        aiChatArea.appendText("🤖 ⏳ Thinking...\n");
+        aiChatArea.appendText("🤖 ⏳ Checking AI engine...\n");
         aiChatArea.setScrollTop(Double.MAX_VALUE);
         inp.clear();
         askBtn.setDisable(true);
 
         OllamaService.askAsync(currentUsername, q, response -> Platform.runLater(() -> {
-            String text = aiChatArea.getText();
-            aiChatArea.setText(text.replace("🤖 ⏳ Thinking...\n", "🤖 " + response + "\n\n"));
+            String current = aiChatArea.getText();
+            if (response.startsWith("[SYSTEM]: ")) {
+                // Install/start progress: replace the last status line
+                String statusMsg = response.substring("[SYSTEM]: ".length());
+                // Remove old checking/status line and show the new one
+                int lastNewline = current.lastIndexOf('\n', current.length() - 2);
+                String withoutLast = lastNewline >= 0 ? current.substring(0, lastNewline + 1) : current;
+                aiChatArea.setText(withoutLast + "🤖 ⏳ " + statusMsg + "\n");
+            } else {
+                // Final answer — replace the last status line with the real response
+                aiChatArea.setText(current.replaceAll("🤖 ⏳[^\n]*\n", "") + "🤖 " + response + "\n\n");
+            }
             aiChatArea.setScrollTop(Double.MAX_VALUE);
-            askBtn.setDisable(false);
+            // Re-enable only when we get the real (non-system) response
+            if (!response.startsWith("[SYSTEM]: ")) {
+                askBtn.setDisable(false);
+            }
         }));
     }
+
 
     // -----------------------------------------------------------------------
     // SETTINGS PANEL (pop scale animation)

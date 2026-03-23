@@ -594,10 +594,11 @@ public class AdminDashboard {
         actionOverlay.setMouseTransparent(true);
         actionOverlay.setPickOnBounds(false); // Let clicks pass through empty space to the card
         actionOverlay.getChildren().addAll(
-                cardBtn("🔒", WARNING_COLOR, "Lock", () -> { server.sendToClient(name, pkt(CommandPacket.Type.LOCK, "{}")); appendActivity("LOCK", name); }),
-                cardBtn("💬", ACCENT_COLOR, "Chat", () -> promptMessage(name)),
+                cardBtn("🔒", WARNING_COLOR, "Lock",   () -> { server.sendToClient(name, pkt(CommandPacket.Type.LOCK,   "{}")); appendActivity("LOCK",   name); }),
+                cardBtn("🔓", SUCCESS_COLOR, "Unlock", () -> { server.sendToClient(name, pkt(CommandPacket.Type.UNLOCK, "{}")); appendActivity("UNLOCK", name); }),
+                cardBtn("💬", ACCENT_COLOR,  "Chat",   () -> promptMessage(name)),
                 cardBtn("⚡", PRIMARY_COLOR, "Command", () -> promptCommand(name)),
-                cardBtn("👁", SUCCESS_COLOR, "Focus", () -> openFullScreenView(name, imgView.getImage()))
+                cardBtn("👁", SUCCESS_COLOR, "Focus",  () -> openFullScreenView(name, imgView.getImage()))
         );
         
         StackPane overlayStack = new StackPane(imgContainer, actionOverlay);
@@ -775,10 +776,11 @@ public class AdminDashboard {
         Button closeBtn = ribbonBtn("✕ EXIT FOCUS", DANGER_COLOR, () -> hideFocusView());
         
         toolbar.getChildren().addAll(
-            ribbonBtn("🔒 LOCK", WARNING_COLOR, () -> { if (currentlyFocusedStudent != null) server.sendToClient(currentlyFocusedStudent, pkt(CommandPacket.Type.LOCK, "{}")); }),
-            ribbonBtn("💬 CHAT", ACCENT_COLOR, () -> { if (currentlyFocusedStudent != null) promptMessage(currentlyFocusedStudent); }),
-            ribbonBtn("⚡ SHELL", PRIMARY_COLOR, () -> { if (currentlyFocusedStudent != null) promptCommand(currentlyFocusedStudent); }),
-            ribbonBtn("⏻ STOP", DANGER_COLOR, () -> { if (currentlyFocusedStudent != null) { server.sendToClient(currentlyFocusedStudent, pkt(CommandPacket.Type.SHUTDOWN, "{}")); hideFocusView(); } }),
+            ribbonBtn("🔒 LOCK",   WARNING_COLOR, () -> { if (currentlyFocusedStudent != null) { server.sendToClient(currentlyFocusedStudent, pkt(CommandPacket.Type.LOCK,   "{}")); appendActivity("LOCK",   currentlyFocusedStudent); } }),
+            ribbonBtn("🔓 UNLOCK", SUCCESS_COLOR, () -> { if (currentlyFocusedStudent != null) { server.sendToClient(currentlyFocusedStudent, pkt(CommandPacket.Type.UNLOCK, "{}")); appendActivity("UNLOCK", currentlyFocusedStudent); } }),
+            ribbonBtn("💬 CHAT",   ACCENT_COLOR,  () -> { if (currentlyFocusedStudent != null) promptMessage(currentlyFocusedStudent); }),
+            ribbonBtn("⚡ SHELL",  PRIMARY_COLOR, () -> { if (currentlyFocusedStudent != null) promptCommand(currentlyFocusedStudent); }),
+            ribbonBtn("⏻ STOP",   DANGER_COLOR,  () -> { if (currentlyFocusedStudent != null) { server.sendToClient(currentlyFocusedStudent, pkt(CommandPacket.Type.SHUTDOWN, "{}")); hideFocusView(); } }),
             closeBtn
         );
 

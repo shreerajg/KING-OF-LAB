@@ -20,9 +20,9 @@ import com.ghost.streaming.webrtc.DxgiCapturer;
 import com.ghost.streaming.webrtc.NvidiaEncoder;
 
 /**
- * King of Lab — upgraded GhostClient.
+ * King of Lab — KingClient (network connection from student to admin).
  *
- * New features vs. Ghost of Lab:
+ * Features:
  *  - Adaptive FPS via AdaptiveStreamController (CPU-aware, AI-aware)
  *  - Heartbeat sender every Config.HEARTBEAT_INTERVAL_SEC seconds
  *  - Exponential back-off reconnect: 3s → 6s → 12s → 24s → max 30s

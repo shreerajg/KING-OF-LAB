@@ -11,9 +11,9 @@ import javafx.application.Platform;
 import javafx.scene.image.Image;
 
 /**
- * King of Lab — upgraded GhostServer.
+ * King of Lab — upgraded KingServer.
  *
- * New features vs. Ghost of Lab:
+ * Features:
  *  - Heartbeat watchdog: marks clients offline after Config.HEARTBEAT_TIMEOUT_SEC
  *  - Audit logging on connect / disconnect / command
  *  - Thread-safe client map (ConcurrentHashMap)
@@ -94,7 +94,7 @@ public class GhostServer {
                         clients.add(handler);
                         pool.execute(handler);
                     } catch (IOException e) {
-                        if (running) AuditLogger.logError("GhostServer.accept", e.getMessage());
+                        if (running) AuditLogger.logError("KingServer.accept", e.getMessage());
                     }
                 }
             } catch (IOException e) {

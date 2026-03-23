@@ -94,6 +94,6 @@ public class StudentRegistrationView {
 
         Scene scene = new Scene(root, 400, 500);
         stage.setScene(scene);
-        stage.setTitle("Ghost - Registration");
+        stage.setTitle("👑 King of Lab — Registration");
     }
 }

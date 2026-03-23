@@ -29,7 +29,7 @@ public class Main extends Application {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("[Main] Shutdown hook: Restoring hosts file...");
             HostsFileManager.restoreHostsFile();
-        }, "GhostShutdownHook"));
+        }, "KingShutdownHook"));
 
         // Always show login screen - no auto-login
         LoginView.show(primaryStage);

@@ -84,7 +84,7 @@ public class DatabaseManager {
 
     /**
      * Detect and re-hash any password that isn't already a 64-char lowercase hex string
-     * (i.e., was stored as plain text by the old Ghost system).
+     * (i.e., was stored as plain text by an older version of the system).
      */
     private static void migratePasswords(Connection conn) throws SQLException {
         String select = "SELECT id, password FROM users";
