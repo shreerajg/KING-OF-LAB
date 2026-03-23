@@ -71,6 +71,30 @@ public class OllamaService {
     }
 
     /**
+     * Check if the specific configured AI model is already pulled and available.
+     */
+    public static boolean isModelAvailable() {
+        try {
+            HttpURLConnection conn = (HttpURLConnection) new URL(Config.OLLAMA_URL + "/api/tags").openConnection();
+            conn.setConnectTimeout(2000);
+            conn.setRequestMethod("GET");
+            if (conn.getResponseCode() == 200) {
+                StringBuilder raw = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) raw.append(line);
+                }
+                return raw.toString().contains("\"name\":\"" + Config.AI_MODEL + "\"") ||
+                       raw.toString().contains("\"name\":\"" + Config.AI_MODEL + ":latest\"");
+            }
+        } catch (Exception e) {
+            // Ignore, default to false
+        }
+        return false;
+    }
+
+    /**
      * Clear conversation history for a student (e.g., on new session).
      */
     public static void clearHistory(String studentName) {
@@ -97,7 +121,14 @@ public class OllamaService {
      * statusCallback receives human-readable progress messages (runs off UI thread).
      */
     public static void ensureOllamaRunning(Consumer<String> statusCallback) {
-        if (isAvailable()) return; // Already up
+        boolean running = isAvailable();
+
+        if (running) {
+            if (!isModelAvailable()) {
+                pullModel(statusCallback);
+            }
+            return;
+        }
 
         notify(statusCallback, "🔍 Ollama not detected — attempting to start...");
 
