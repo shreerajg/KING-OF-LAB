@@ -17,10 +17,18 @@ public class StudentAttendance {
     public StudentAttendance(String username, int rollNumber, String className, String division) {
         this.username = username;
         this.rollNumber = rollNumber;
-        this.className = className;
-        this.division = division;
+        this.className = className != null ? className.trim().toUpperCase() : "";
+        this.division = division != null ? division.trim().toUpperCase() : "";
         this.firstConnected = LocalDateTime.now();
         this.lastSeen = LocalDateTime.now();
+    }
+
+    public void setFirstConnected(LocalDateTime firstConnected) {
+        this.firstConnected = firstConnected;
+    }
+
+    public void setLastSeen(LocalDateTime lastSeen) {
+        this.lastSeen = lastSeen;
     }
 
     public void updateLastSeen() {
@@ -61,6 +69,7 @@ public class StudentAttendance {
     }
 
     public String getClassDivision() {
-        return className + division;
+        String combined = className + division;
+        return combined.isEmpty() ? "UNKNOWN" : combined;
     }
 }

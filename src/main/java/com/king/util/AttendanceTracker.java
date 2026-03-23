@@ -3,6 +3,7 @@ package com.king.util;
 import com.king.model.StudentAttendance;
 import java.io.*;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -62,20 +63,67 @@ public class AttendanceTracker {
         // Generate CSV for each class-division
         for (Map.Entry<String, List<StudentAttendance>> entry : groupedByClass.entrySet()) {
             String classDivision = entry.getKey();
-            List<StudentAttendance> students = entry.getValue();
-
-            // Sort by roll number
-            students.sort(Comparator.comparingInt(StudentAttendance::getRollNumber));
+            List<StudentAttendance> currentStudents = entry.getValue();
 
             String filename = "Attendance_" + classDivision + "_" + date + ".csv";
             File csvFile = new File(attendanceDir, filename);
+
+            Map<String, StudentAttendance> mergedStudents = new HashMap<>();
+
+            // 1. Read existing from CSV to avoid overwriting lost state
+            if (csvFile.exists()) {
+                try (BufferedReader reader = new BufferedReader(new FileReader(csvFile))) {
+                    String line = reader.readLine(); // skip header
+                    while ((line = reader.readLine()) != null) {
+                        String[] parts = line.split(",");
+                        if (parts.length >= 6) {
+                            try {
+                                int roll = Integer.parseInt(parts[0].trim());
+                                String user = parts[1].trim();
+                                String cl = parts[2].trim();
+                                String div = parts[3].trim();
+                                LocalDateTime fc = LocalDateTime.parse(parts[4].trim(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                                LocalDateTime ls = LocalDateTime.parse(parts[5].trim(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                                
+                                StudentAttendance oldAtt = new StudentAttendance(user, roll, cl, div);
+                                oldAtt.setFirstConnected(fc);
+                                oldAtt.setLastSeen(ls);
+                                mergedStudents.put(user, oldAtt);
+                            } catch (Exception e) {
+                                // Ignore parse errors for a single line
+                            }
+                        }
+                    }
+                } catch (IOException e) {
+                    System.err.println("[Attendance] Failed to read existing CSV: " + e.getMessage());
+                }
+            }
+
+            // 2. Merge with current in-memory map
+            for (StudentAttendance curr : currentStudents) {
+                if (mergedStudents.containsKey(curr.getUsername())) {
+                    StudentAttendance existing = mergedStudents.get(curr.getUsername());
+                    if (curr.getLastSeen().isAfter(existing.getLastSeen())) {
+                        existing.setLastSeen(curr.getLastSeen());
+                    }
+                    if (curr.getFirstConnected().isBefore(existing.getFirstConnected())) {
+                        existing.setFirstConnected(curr.getFirstConnected());
+                    }
+                } else {
+                    mergedStudents.put(curr.getUsername(), curr);
+                }
+            }
+
+            // 3. Sort merged list by roll number
+            List<StudentAttendance> finalStudents = new ArrayList<>(mergedStudents.values());
+            finalStudents.sort(Comparator.comparingInt(StudentAttendance::getRollNumber));
 
             try (PrintWriter writer = new PrintWriter(new FileWriter(csvFile))) {
                 // Write CSV header
                 writer.println("Roll Number,Username,Class,Division,First Connected,Last Seen");
 
                 // Write student records
-                for (StudentAttendance student : students) {
+                for (StudentAttendance student : finalStudents) {
                     writer.printf("%d,%s,%s,%s,%s,%s%n",
                             student.getRollNumber(),
                             student.getUsername(),
@@ -85,9 +133,11 @@ public class AttendanceTracker {
                             student.getLastSeenFormatted());
                 }
 
-                generatedFiles.add(csvFile.getAbsolutePath());
+                if (!generatedFiles.contains(csvFile.getAbsolutePath())) {
+                    generatedFiles.add(csvFile.getAbsolutePath());
+                }
                 System.out.println("[Attendance] Generated: " + csvFile.getAbsolutePath() +
-                        " (" + students.size() + " students)");
+                        " (" + finalStudents.size() + " students)");
 
             } catch (IOException e) {
                 System.err.println("[Attendance] Failed to write CSV: " + e.getMessage());
