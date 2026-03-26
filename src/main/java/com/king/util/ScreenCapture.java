@@ -104,7 +104,7 @@ public class ScreenCapture {
             }
 
             reusableGraphics.drawImage(capture, 0, 0, newW, newH, null);
-            drawMouseCursor(reusableGraphics, resolutionScale, resolutionScale);
+            // Cursor deliberately NOT drawn for student capture
 
             return encodeJpeg(reusableBuffer, jpegQuality);
 
@@ -128,7 +128,7 @@ public class ScreenCapture {
             }
 
             reusableGraphics.drawImage(capture, 0, 0, newW, newH, null);
-            drawMouseCursor(reusableGraphics, resolutionScale, resolutionScale);
+            // Cursor deliberately NOT drawn for student capture
 
             ByteArrayOutputStream baos = new ByteArrayOutputStream(50_000);
             Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpg");
@@ -193,7 +193,7 @@ public class ScreenCapture {
                         RenderingHints.VALUE_RENDER_SPEED);
             }
             reusableGraphics.drawImage(capture, 0, 0, newW, newH, null);
-            drawMouseCursor(reusableGraphics, 1.0, 1.0);
+            // Cursor deliberately NOT drawn for student capture
 
             return encodeJpeg(reusableBuffer, 0.72f);
 
@@ -244,7 +244,7 @@ public class ScreenCapture {
         Thread t = new Thread(() -> {
             while (asyncRunning) {
                 try {
-                    String frame = captureAsBase64(1.0, 0.8f);
+                    String frame = captureAsBase64WithCursor(1.0, 0.8f);
                     if (frame != null) latestFrame.set(frame);
                     Thread.sleep(16); // ~60 Hz max capture rate for admin share
                 } catch (InterruptedException e) {
@@ -304,6 +304,42 @@ public class ScreenCapture {
 
     public static String captureAsBase64(double scale) { return captureAsBase64(scale, 0.85f); }
     public static String captureHighQuality()           { return captureAsBase64(1.0,  0.95f); }
+
+    // Used exclusively by Admin Screen Share
+    public static String captureAsBase64WithCursor(double resolutionScale, float jpegQuality) {
+        try {
+            long now     = System.currentTimeMillis();
+            long aligned = (now / 16) * 16;
+            long wait    = aligned + 16 - now;
+            if (wait > 0 && wait < 16) Thread.sleep(wait);
+
+            BufferedImage capture = robot.createScreenCapture(screenRect);
+
+            int newW = (int) (capture.getWidth()  * resolutionScale);
+            int newH = (int) (capture.getHeight() * resolutionScale);
+
+            if (reusableBuffer == null
+                    || reusableBuffer.getWidth()  != newW
+                    || reusableBuffer.getHeight() != newH) {
+                if (reusableGraphics != null) reusableGraphics.dispose();
+                reusableBuffer   = new BufferedImage(newW, newH, BufferedImage.TYPE_INT_RGB);
+                reusableGraphics = reusableBuffer.createGraphics();
+                reusableGraphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                        RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                reusableGraphics.setRenderingHint(RenderingHints.KEY_RENDERING,
+                        RenderingHints.VALUE_RENDER_SPEED);
+                prevFrame = null;
+            }
+
+            reusableGraphics.drawImage(capture, 0, 0, newW, newH, null);
+            drawMouseCursor(reusableGraphics, resolutionScale, resolutionScale);
+
+            return encodeJpeg(reusableBuffer, jpegQuality);
+
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
     public static BufferedImage decodeBase64(String base64) {
         try {
