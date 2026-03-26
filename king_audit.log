@@ -369,3 +369,20 @@
 [2026-03-27 00:09:14] [SYSTEM] Admin dashboard closed
 [2026-03-27 00:09:19] [ERROR] [BinaryStream] Connection reset
 [2026-03-27 00:09:19] [DISCONNECT] Student disconnected: shree
+[2026-03-27 00:23:52] [SYSTEM] King of Lab v3.0 started
+[2026-03-27 00:23:52] [SYSTEM] Database initialised
+[2026-03-27 00:23:57] [LOGIN] admin logged in successfully
+[2026-03-27 00:23:58] [SYSTEM] King of Lab Admin started
+[2026-03-27 00:23:58] [SYSTEM] King Server listening on port 5555
+[2026-03-27 00:23:58] [SYSTEM] Ultra-Binary Stream Server listening on port 5556
+[2026-03-27 00:24:08] [SYSTEM] King of Lab v3.0 started
+[2026-03-27 00:24:08] [SYSTEM] Database initialised
+[2026-03-27 00:24:13] [LOGIN] shree logged in successfully
+[2026-03-27 00:24:14] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-27 00:24:14] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-27 00:24:14] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-27 00:24:25] [SYSTEM] Switching Stream Mode to: ULTRA_WEBRTC
+[2026-03-27 00:24:25] [SYSTEM] Stream Mode switched to ULTRA_WEBRTC
+[2026-03-27 00:24:29] [SYSTEM] Switching Stream Mode to: LEGACY_CPU
+[2026-03-27 00:24:29] [SYSTEM] Stream Mode switched to LEGACY_CPU
+[2026-03-27 00:24:30] [ERROR] [UltraStream] Cannot enter synchronized block because "this.bOut" is null

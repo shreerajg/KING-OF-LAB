@@ -2,52 +2,40 @@ package com.king.util;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferInt;
-import java.io.ByteArrayOutputStream;
+import java.io.*;
 import java.util.Base64;
 import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.imageio.*;
 import javax.imageio.stream.ImageOutputStream;
 
-import com.sun.jna.Memory;
-import com.sun.jna.platform.win32.GDI32;
-import com.sun.jna.platform.win32.User32;
-import com.sun.jna.platform.win32.WinDef.HBITMAP;
-import com.sun.jna.platform.win32.WinDef.HDC;
-import com.sun.jna.platform.win32.WinDef.HWND;
-import com.sun.jna.platform.win32.WinGDI;
-import com.sun.jna.platform.win32.WinGDI.BITMAPINFO;
-
 /**
- * King of Lab — upgraded ScreenCapture.
+ * King of Lab — ScreenCapture
  *
- * New features vs. King of Lab:
- *  - Delta-frame detection: if the frame has < DELTA_THRESHOLD% of pixels changed,
- *    captureForStreaming() returns null (skip send — saves bandwidth).
- *  - Cursor flicker fix: capture interval aligned to 16 ms boundary.
- *  - configurable quality via AdaptiveStreamController FPS tier.
+ * STUDENT CAPTURE: Uses FFmpeg gdigrab with -draw_mouse 0.
+ *   This is the ONLY guaranteed way on Windows to exclude the hardware
+ *   cursor from the captured bitmap. The cursor is composited by Windows
+ *   as a separate overlay layer; -draw_mouse 0 tells gdigrab to skip it.
+ *
+ * ADMIN SCREEN-SHARE: Uses AWT Robot with the cursor manually drawn on top,
+ *   so students can see the admin's pointer during screen sharing.
+ *
+ * Flickering explained: AWT Robot.createScreenCapture() hides the hardware
+ *   cursor momentarily every frame to include it, causing rapid show/hide
+ *   which the student sees as flickering. FFmpeg gdigrab avoids this entirely.
  */
 public class ScreenCapture {
 
     private static Rectangle     screenRect;
     private static BufferedImage reusableBuffer;
     private static Graphics2D    reusableGraphics;
-    private static BufferedImage prevFrame; // for delta detection
+    private static BufferedImage prevFrame;
 
-    // JNA native capture state
-    private static HWND desktopWindow;
-    private static HDC windowDC;
-    private static HDC memDC;
-    private static HBITMAP hBitmap;
-    private static BITMAPINFO bmi;
-    private static BufferedImage gdiBuffer;
-
-    // Delta threshold: skip frame if fewer than 1.5% of pixels differ
     private static final double DELTA_THRESHOLD = 0.015;
 
-    // Async double-buffer
-    private static final java.util.concurrent.atomic.AtomicReference<String>
-            latestFrame = new java.util.concurrent.atomic.AtomicReference<>(null);
+    // Async double-buffer (admin screen-share)
+    private static final AtomicReference<String> latestFrame = new AtomicReference<>(null);
     private static volatile boolean asyncRunning = false;
 
     public static final double QUALITY_LOW    = 0.30;
@@ -56,7 +44,7 @@ public class ScreenCapture {
     public static final double QUALITY_ULTRA  = 0.90;
 
     // -----------------------------------------------------------------------
-    // Cursor shape (drawn manually since AWT Robot doesn't capture it)
+    // Cursor shape — only used in admin screen share
     // -----------------------------------------------------------------------
     private static final int[][] CURSOR_SHAPE = {
             {1,0,0,0,0,0,0,0,0,0,0,0},
@@ -80,223 +68,161 @@ public class ScreenCapture {
             {0,0,0,0,0,0,0,1,1,0,0,0},
     };
 
+    // AWT Robot — used ONLY for admin screen-share (cursor needed there)
+    private static Robot adminRobot;
+
+    // FFmpeg check
+    private static final AtomicBoolean ffmpegChecked = new AtomicBoolean(false);
+    private static volatile boolean ffmpegAvailable = false;
+
     static {
         screenRect = new Rectangle(Toolkit.getDefaultToolkit().getScreenSize());
-        initGdiCapture();
-    }
-
-    private static void initGdiCapture() {
         try {
-            desktopWindow = User32.INSTANCE.GetDesktopWindow();
-            windowDC      = User32.INSTANCE.GetDC(desktopWindow);
-            memDC         = GDI32.INSTANCE.CreateCompatibleDC(windowDC);
-            
-            int width  = screenRect.width;
-            int height = screenRect.height;
-            
-            hBitmap = GDI32.INSTANCE.CreateCompatibleBitmap(windowDC, width, height);
-            GDI32.INSTANCE.SelectObject(memDC, hBitmap);
-            
-            bmi = new BITMAPINFO();
-            bmi.bmiHeader.biWidth = width;
-            bmi.bmiHeader.biHeight = -height; // top-down
-            bmi.bmiHeader.biPlanes = 1;
-            bmi.bmiHeader.biBitCount = 32;
-            bmi.bmiHeader.biCompression = WinGDI.BI_RGB;
-            
-            gdiBuffer = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-        } catch (Throwable t) {
-            System.err.println("[ScreenCapture] Failed to init GDI capture. Falling back to native buffer.");
+            adminRobot = new Robot();
+            adminRobot.setAutoDelay(0);
+        } catch (AWTException e) {
+            adminRobot = null;
         }
+        checkFfmpeg();
     }
 
-    private static BufferedImage grabDesktopInternal() {
-        if (memDC == null) return null; // fallback if JNA not available
-        int width  = screenRect.width;
-        int height = screenRect.height;
-        
-        GDI32.INSTANCE.BitBlt(memDC, 0, 0, width, height, windowDC, 0, 0, GDI32.SRCCOPY);
-        
-        int[] pixels = ((DataBufferInt) gdiBuffer.getRaster().getDataBuffer()).getData();
-        Memory memory = new Memory((long) pixels.length * 4);
-        GDI32.INSTANCE.GetDIBits(windowDC, hBitmap, 0, height, memory, bmi, WinGDI.DIB_RGB_COLORS);
-        memory.read(0, pixels, 0, pixels.length);
-        
-        return gdiBuffer;
+    private static void checkFfmpeg() {
+        try {
+            Process p = Runtime.getRuntime().exec(new String[]{"ffmpeg", "-version"});
+            p.waitFor();
+            ffmpegAvailable = (p.exitValue() == 0);
+        } catch (Exception e) {
+            ffmpegAvailable = false;
+        }
+        ffmpegChecked.set(true);
     }
 
     // -----------------------------------------------------------------------
-    // Core capture
+    // STUDENT CAPTURE — cursor excluded via FFmpeg gdigrab -draw_mouse 0
+    // -----------------------------------------------------------------------
+
+    /**
+     * Captures one JPEG frame WITHOUT the mouse cursor.
+     * Uses FFmpeg gdigrab -draw_mouse 0 on Windows to guarantee cursor exclusion.
+     * Falls back to AWT Robot (cursor may be present) only if FFmpeg is missing.
+     */
+    private static BufferedImage captureStudentFrame() {
+        if (ffmpegAvailable) {
+            return captureViaFfmpegGdigrab();
+        }
+        // Last-resort fallback — no flicker workaround possible without ffmpeg
+        if (adminRobot != null) {
+            return adminRobot.createScreenCapture(screenRect);
+        }
+        return new BufferedImage(screenRect.width, screenRect.height, BufferedImage.TYPE_INT_RGB);
+    }
+
+    /**
+     * Captures one frame using FFmpeg gdigrab with -draw_mouse 0.
+     * FFmpeg grabs the desktop DC directly without hiding the cursor via the
+     * OS API, so there is zero flickering on the student's screen.
+     */
+    private static BufferedImage captureViaFfmpegGdigrab() {
+        try {
+            // We capture exactly 1 frame via stdout as MJPEG/rawvideo
+            ProcessBuilder pb = new ProcessBuilder(
+                "ffmpeg",
+                "-loglevel",  "quiet",
+                "-f",         "gdigrab",
+                "-draw_mouse","0",           // <-- THE KEY FLAG: exclude cursor
+                "-i",         "desktop",
+                "-vframes",   "1",
+                "-f",         "image2",
+                "-vcodec",    "mjpeg",
+                "-q:v",       "3",
+                "pipe:1"
+            );
+            pb.redirectErrorStream(false);
+            Process proc = pb.start();
+
+            byte[] jpegBytes;
+            try (InputStream is = proc.getInputStream()) {
+                jpegBytes = is.readAllBytes();
+            }
+            proc.waitFor();
+
+            if (jpegBytes == null || jpegBytes.length == 0) return null;
+
+            return ImageIO.read(new ByteArrayInputStream(jpegBytes));
+
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Public API — student facing (no cursor)
     // -----------------------------------------------------------------------
 
     public static String captureAsBase64(double resolutionScale, float jpegQuality) {
         try {
-            // Align capture to 16 ms boundary to reduce cursor flicker
-            long now     = System.currentTimeMillis();
-            long aligned = (now / 16) * 16;
-            long wait    = aligned + 16 - now;
-            if (wait > 0 && wait < 16) Thread.sleep(wait);
+            BufferedImage capture = captureStudentFrame();
+            if (capture == null) return null;
 
-            BufferedImage capture = grabDesktopInternal();
-            if (capture == null) {
-               // If GDI fails, return a blank frame rather than using flickering Robot
-               capture = new BufferedImage(screenRect.width, screenRect.height, BufferedImage.TYPE_INT_RGB);
-            }
-
-            int newW = (int) (capture.getWidth()  * resolutionScale);
-            int newH = (int) (capture.getHeight() * resolutionScale);
-
-            if (reusableBuffer == null
-                    || reusableBuffer.getWidth()  != newW
-                    || reusableBuffer.getHeight() != newH) {
-                if (reusableGraphics != null) reusableGraphics.dispose();
-                reusableBuffer   = new BufferedImage(newW, newH, BufferedImage.TYPE_INT_RGB);
-                reusableGraphics = reusableBuffer.createGraphics();
-                reusableGraphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                        RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                reusableGraphics.setRenderingHint(RenderingHints.KEY_RENDERING,
-                        RenderingHints.VALUE_RENDER_SPEED);
-                prevFrame = null; // reset delta baseline on size change
-            }
+            int newW = (int)(capture.getWidth()  * resolutionScale);
+            int newH = (int)(capture.getHeight() * resolutionScale);
+            ensureBuffer(newW, newH, false);
 
             reusableGraphics.drawImage(capture, 0, 0, newW, newH, null);
-            // Cursor deliberately NOT drawn for student capture
-
             return encodeJpeg(reusableBuffer, jpegQuality);
-
         } catch (Exception e) {
-            e.printStackTrace();
             return null;
         }
     }
 
     public static byte[] captureAsBytes(double resolutionScale, float jpegQuality) {
         try {
-            BufferedImage capture = grabDesktopInternal();
-            if (capture == null) {
-               capture = new BufferedImage(screenRect.width, screenRect.height, BufferedImage.TYPE_INT_RGB);
-            }
-            int newW = (int) (capture.getWidth()  * resolutionScale);
-            int newH = (int) (capture.getHeight() * resolutionScale);
+            BufferedImage capture = captureStudentFrame();
+            if (capture == null) return null;
 
-            if (reusableBuffer == null || reusableBuffer.getWidth() != newW || reusableBuffer.getHeight() != newH) {
-                if (reusableGraphics != null) reusableGraphics.dispose();
-                reusableBuffer   = new BufferedImage(newW, newH, BufferedImage.TYPE_INT_RGB);
-                reusableGraphics = reusableBuffer.createGraphics();
-                reusableGraphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            }
+            int newW = (int)(capture.getWidth()  * resolutionScale);
+            int newH = (int)(capture.getHeight() * resolutionScale);
+            ensureBuffer(newW, newH, false);
 
             reusableGraphics.drawImage(capture, 0, 0, newW, newH, null);
-            // Cursor deliberately NOT drawn for student capture
-
-            ByteArrayOutputStream baos = new ByteArrayOutputStream(50_000);
-            Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpg");
-            if (writers.hasNext()) {
-                ImageWriter writer = writers.next();
-                ImageWriteParam param = writer.getDefaultWriteParam();
-                param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-                param.setCompressionQuality(jpegQuality);
-                ImageOutputStream ios = ImageIO.createImageOutputStream(baos);
-                writer.setOutput(ios);
-                writer.write(null, new IIOImage(reusableBuffer, null, null), param);
-                writer.dispose();
-                ios.close();
-            }
-            return baos.toByteArray();
+            return encodeJpegBytes(reusableBuffer, jpegQuality);
         } catch (Exception e) {
             return null;
         }
     }
 
-    // -----------------------------------------------------------------------
-    // Streaming entry point (with delta detection)
-    // -----------------------------------------------------------------------
-
     /**
-     * Captures the screen for streaming.
-     * Returns null if the frame changed less than DELTA_THRESHOLD — caller must skip sending.
+     * Streaming capture with delta detection.
+     * Returns null if frame is nearly identical to previous (bandwidth optimization).
      */
     public static String captureForStreaming() {
         try {
-            long now     = System.currentTimeMillis();
-            long aligned = (now / 16) * 16;
-            long wait    = aligned + 16 - now;
-            if (wait > 0 && wait < 16) Thread.sleep(wait);
+            BufferedImage capture = captureStudentFrame();
+            if (capture == null) return null;
 
-            BufferedImage capture = grabDesktopInternal();
-            if (capture == null) {
-               capture = new BufferedImage(screenRect.width, screenRect.height, BufferedImage.TYPE_INT_RGB);
-            }
-
-            // Delta check at quarter resolution for speed
             if (prevFrame != null && isDeltaSmall(prevFrame, capture)) {
-                return null; // frame effectively unchanged
+                return null;
             }
 
-            // Store a quarter-res copy of this frame for next delta check
+            // Store quarter-res copy for next delta check
             int qW = capture.getWidth()  / 4;
             int qH = capture.getHeight() / 4;
             prevFrame = new BufferedImage(qW, qH, BufferedImage.TYPE_INT_RGB);
             prevFrame.createGraphics().drawImage(capture, 0, 0, qW, qH, null);
 
-            // Scale to full stream resolution and encode
             int newW = capture.getWidth();
             int newH = capture.getHeight();
-
-            if (reusableBuffer == null
-                    || reusableBuffer.getWidth()  != newW
-                    || reusableBuffer.getHeight() != newH) {
-                if (reusableGraphics != null) reusableGraphics.dispose();
-                reusableBuffer   = new BufferedImage(newW, newH, BufferedImage.TYPE_INT_RGB);
-                reusableGraphics = reusableBuffer.createGraphics();
-                reusableGraphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                        RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                reusableGraphics.setRenderingHint(RenderingHints.KEY_RENDERING,
-                        RenderingHints.VALUE_RENDER_SPEED);
-            }
+            ensureBuffer(newW, newH, false);
             reusableGraphics.drawImage(capture, 0, 0, newW, newH, null);
-            // Cursor deliberately NOT drawn for student capture
 
             return encodeJpeg(reusableBuffer, 0.72f);
-
         } catch (Exception e) {
             return null;
         }
     }
 
     // -----------------------------------------------------------------------
-    // Delta detection
-    // -----------------------------------------------------------------------
-
-    /**
-     * Compare two images at quarter resolution.
-     * Returns true if proportion of changed pixels < DELTA_THRESHOLD.
-     */
-    private static boolean isDeltaSmall(BufferedImage prev, BufferedImage current) {
-        int qW = prev.getWidth();
-        int qH = prev.getHeight();
-
-        // Down-sample current to quarter res for comparison
-        BufferedImage curQ = new BufferedImage(qW, qH, BufferedImage.TYPE_INT_RGB);
-        curQ.createGraphics().drawImage(current, 0, 0, qW, qH, null);
-
-        int totalPixels   = qW * qH;
-        int changedPixels = 0;
-        int threshold     = (int) (totalPixels * DELTA_THRESHOLD);
-
-        for (int y = 0; y < qH; y++) {
-            for (int x = 0; x < qW; x++) {
-                if (prev.getRGB(x, y) != curQ.getRGB(x, y)) {
-                    changedPixels++;
-                    if (changedPixels > threshold) return false; // early exit — frame changed enough
-                }
-            }
-        }
-        return true; // very few pixels changed — skip this frame
-    }
-
-    // -----------------------------------------------------------------------
-    // Async capture (used by admin screen-share)
+    // Async capture — ADMIN screen share (cursor included)
     // -----------------------------------------------------------------------
 
     public static void startAsyncCapture() {
@@ -308,7 +234,7 @@ public class ScreenCapture {
                 try {
                     String frame = captureAsBase64WithCursor(1.0, 0.8f);
                     if (frame != null) latestFrame.set(frame);
-                    Thread.sleep(16); // ~60 Hz max capture rate for admin share
+                    Thread.sleep(16);
                 } catch (InterruptedException e) {
                     break;
                 } catch (Exception ignored) {}
@@ -327,14 +253,77 @@ public class ScreenCapture {
     public static String getLatestFrame() { return latestFrame.get(); }
 
     // -----------------------------------------------------------------------
+    // ADMIN Screen Share — cursor included (AWT Robot + manual draw)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Used ONLY for admin screen-share so students can see the admin's cursor.
+     */
+    public static String captureAsBase64WithCursor(double resolutionScale, float jpegQuality) {
+        try {
+            if (adminRobot == null) return null;
+
+            BufferedImage capture = adminRobot.createScreenCapture(screenRect);
+            int newW = (int)(capture.getWidth()  * resolutionScale);
+            int newH = (int)(capture.getHeight() * resolutionScale);
+            ensureBuffer(newW, newH, true);
+
+            reusableGraphics.drawImage(capture, 0, 0, newW, newH, null);
+            drawMouseCursor(reusableGraphics, resolutionScale, resolutionScale);
+
+            return encodeJpeg(reusableBuffer, jpegQuality);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Convenience overloads
+    // -----------------------------------------------------------------------
+    public static String captureAsBase64(double scale) { return captureAsBase64(scale, 0.85f); }
+    public static String captureHighQuality()           { return captureAsBase64(1.0, 0.95f); }
+
+    // -----------------------------------------------------------------------
+    // Delta detection
+    // -----------------------------------------------------------------------
+    private static boolean isDeltaSmall(BufferedImage prev, BufferedImage current) {
+        int qW = prev.getWidth();
+        int qH = prev.getHeight();
+        BufferedImage curQ = new BufferedImage(qW, qH, BufferedImage.TYPE_INT_RGB);
+        curQ.createGraphics().drawImage(current, 0, 0, qW, qH, null);
+        int total   = qW * qH;
+        int changed = 0;
+        int thresh  = (int)(total * DELTA_THRESHOLD);
+        for (int y = 0; y < qH; y++) {
+            for (int x = 0; x < qW; x++) {
+                if (prev.getRGB(x, y) != curQ.getRGB(x, y)) {
+                    if (++changed > thresh) return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 
+    private static void ensureBuffer(int w, int h, boolean resetPrevFrame) {
+        if (reusableBuffer == null || reusableBuffer.getWidth() != w || reusableBuffer.getHeight() != h) {
+            if (reusableGraphics != null) reusableGraphics.dispose();
+            reusableBuffer   = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+            reusableGraphics = reusableBuffer.createGraphics();
+            reusableGraphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            reusableGraphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_SPEED);
+            if (resetPrevFrame) prevFrame = null;
+        }
+    }
+
     private static void drawMouseCursor(Graphics2D g, double scaleX, double scaleY) {
         try {
-            Point p  = MouseInfo.getPointerInfo().getLocation();
-            int mx   = (int) (p.x * scaleX);
-            int my   = (int) (p.y * scaleY);
+            Point p = MouseInfo.getPointerInfo().getLocation();
+            int mx = (int)(p.x * scaleX);
+            int my = (int)(p.y * scaleY);
             for (int row = 0; row < CURSOR_SHAPE.length; row++) {
                 for (int col = 0; col < CURSOR_SHAPE[row].length; col++) {
                     int val = CURSOR_SHAPE[row][col];
@@ -346,6 +335,10 @@ public class ScreenCapture {
     }
 
     private static String encodeJpeg(BufferedImage img, float quality) throws Exception {
+        return Base64.getEncoder().encodeToString(encodeJpegBytes(img, quality));
+    }
+
+    private static byte[] encodeJpegBytes(BufferedImage img, float quality) throws Exception {
         ByteArrayOutputStream baos = new ByteArrayOutputStream(50_000);
         Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpg");
         if (writers.hasNext()) {
@@ -361,55 +354,13 @@ public class ScreenCapture {
         } else {
             ImageIO.write(img, "jpg", baos);
         }
-        return Base64.getEncoder().encodeToString(baos.toByteArray());
-    }
-
-    public static String captureAsBase64(double scale) { return captureAsBase64(scale, 0.85f); }
-    public static String captureHighQuality()           { return captureAsBase64(1.0,  0.95f); }
-
-    // Used exclusively by Admin Screen Share
-    public static String captureAsBase64WithCursor(double resolutionScale, float jpegQuality) {
-        try {
-            long now     = System.currentTimeMillis();
-            long aligned = (now / 16) * 16;
-            long wait    = aligned + 16 - now;
-            if (wait > 0 && wait < 16) Thread.sleep(wait);
-
-            BufferedImage capture = grabDesktopInternal();
-            if (capture == null) {
-               capture = new BufferedImage(screenRect.width, screenRect.height, BufferedImage.TYPE_INT_RGB);
-            }
-
-            int newW = (int) (capture.getWidth()  * resolutionScale);
-            int newH = (int) (capture.getHeight() * resolutionScale);
-
-            if (reusableBuffer == null
-                    || reusableBuffer.getWidth()  != newW
-                    || reusableBuffer.getHeight() != newH) {
-                if (reusableGraphics != null) reusableGraphics.dispose();
-                reusableBuffer   = new BufferedImage(newW, newH, BufferedImage.TYPE_INT_RGB);
-                reusableGraphics = reusableBuffer.createGraphics();
-                reusableGraphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                        RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                reusableGraphics.setRenderingHint(RenderingHints.KEY_RENDERING,
-                        RenderingHints.VALUE_RENDER_SPEED);
-                prevFrame = null;
-            }
-
-            reusableGraphics.drawImage(capture, 0, 0, newW, newH, null);
-            drawMouseCursor(reusableGraphics, resolutionScale, resolutionScale);
-
-            return encodeJpeg(reusableBuffer, jpegQuality);
-
-        } catch (Exception e) {
-            return null;
-        }
+        return baos.toByteArray();
     }
 
     public static BufferedImage decodeBase64(String base64) {
         try {
             byte[] bytes = Base64.getDecoder().decode(base64);
-            return ImageIO.read(new java.io.ByteArrayInputStream(bytes));
+            return ImageIO.read(new ByteArrayInputStream(bytes));
         } catch (Exception e) {
             return null;
         }
