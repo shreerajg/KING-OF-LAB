@@ -2,11 +2,21 @@ package com.king.util;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferInt;
 import java.io.ByteArrayOutputStream;
 import java.util.Base64;
 import java.util.Iterator;
 import javax.imageio.*;
 import javax.imageio.stream.ImageOutputStream;
+
+import com.sun.jna.Memory;
+import com.sun.jna.platform.win32.GDI32;
+import com.sun.jna.platform.win32.User32;
+import com.sun.jna.platform.win32.WinDef.HBITMAP;
+import com.sun.jna.platform.win32.WinDef.HDC;
+import com.sun.jna.platform.win32.WinDef.HWND;
+import com.sun.jna.platform.win32.WinGDI;
+import com.sun.jna.platform.win32.WinGDI.BITMAPINFO;
 
 /**
  * King of Lab — upgraded ScreenCapture.
@@ -19,11 +29,18 @@ import javax.imageio.stream.ImageOutputStream;
  */
 public class ScreenCapture {
 
-    private static Robot         robot;
     private static Rectangle     screenRect;
     private static BufferedImage reusableBuffer;
     private static Graphics2D    reusableGraphics;
     private static BufferedImage prevFrame; // for delta detection
+
+    // JNA native capture state
+    private static HWND desktopWindow;
+    private static HDC windowDC;
+    private static HDC memDC;
+    private static HBITMAP hBitmap;
+    private static BITMAPINFO bmi;
+    private static BufferedImage gdiBuffer;
 
     // Delta threshold: skip frame if fewer than 1.5% of pixels differ
     private static final double DELTA_THRESHOLD = 0.015;
@@ -64,13 +81,48 @@ public class ScreenCapture {
     };
 
     static {
+        screenRect = new Rectangle(Toolkit.getDefaultToolkit().getScreenSize());
+        initGdiCapture();
+    }
+
+    private static void initGdiCapture() {
         try {
-            robot = new Robot();
-            robot.setAutoDelay(0);
-            screenRect = new Rectangle(Toolkit.getDefaultToolkit().getScreenSize());
-        } catch (AWTException e) {
-            e.printStackTrace();
+            desktopWindow = User32.INSTANCE.GetDesktopWindow();
+            windowDC      = User32.INSTANCE.GetDC(desktopWindow);
+            memDC         = GDI32.INSTANCE.CreateCompatibleDC(windowDC);
+            
+            int width  = screenRect.width;
+            int height = screenRect.height;
+            
+            hBitmap = GDI32.INSTANCE.CreateCompatibleBitmap(windowDC, width, height);
+            GDI32.INSTANCE.SelectObject(memDC, hBitmap);
+            
+            bmi = new BITMAPINFO();
+            bmi.bmiHeader.biWidth = width;
+            bmi.bmiHeader.biHeight = -height; // top-down
+            bmi.bmiHeader.biPlanes = 1;
+            bmi.bmiHeader.biBitCount = 32;
+            bmi.bmiHeader.biCompression = WinGDI.BI_RGB;
+            
+            gdiBuffer = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        } catch (Throwable t) {
+            System.err.println("[ScreenCapture] Failed to init GDI capture. Falling back to native buffer.");
         }
+    }
+
+    private static BufferedImage grabDesktopInternal() {
+        if (memDC == null) return null; // fallback if JNA not available
+        int width  = screenRect.width;
+        int height = screenRect.height;
+        
+        GDI32.INSTANCE.BitBlt(memDC, 0, 0, width, height, windowDC, 0, 0, GDI32.SRCCOPY);
+        
+        int[] pixels = ((DataBufferInt) gdiBuffer.getRaster().getDataBuffer()).getData();
+        Memory memory = new Memory((long) pixels.length * 4);
+        GDI32.INSTANCE.GetDIBits(windowDC, hBitmap, 0, height, memory, bmi, WinGDI.DIB_RGB_COLORS);
+        memory.read(0, pixels, 0, pixels.length);
+        
+        return gdiBuffer;
     }
 
     // -----------------------------------------------------------------------
@@ -85,7 +137,11 @@ public class ScreenCapture {
             long wait    = aligned + 16 - now;
             if (wait > 0 && wait < 16) Thread.sleep(wait);
 
-            BufferedImage capture = robot.createScreenCapture(screenRect);
+            BufferedImage capture = grabDesktopInternal();
+            if (capture == null) {
+               // Hard fallback just in case
+               capture = new Robot().createScreenCapture(screenRect);
+            }
 
             int newW = (int) (capture.getWidth()  * resolutionScale);
             int newH = (int) (capture.getHeight() * resolutionScale);
@@ -116,7 +172,10 @@ public class ScreenCapture {
 
     public static byte[] captureAsBytes(double resolutionScale, float jpegQuality) {
         try {
-            BufferedImage capture = robot.createScreenCapture(screenRect);
+            BufferedImage capture = grabDesktopInternal();
+            if (capture == null) {
+               capture = new Robot().createScreenCapture(screenRect);
+            }
             int newW = (int) (capture.getWidth()  * resolutionScale);
             int newH = (int) (capture.getHeight() * resolutionScale);
 
@@ -164,7 +223,10 @@ public class ScreenCapture {
             long wait    = aligned + 16 - now;
             if (wait > 0 && wait < 16) Thread.sleep(wait);
 
-            BufferedImage capture = robot.createScreenCapture(screenRect);
+            BufferedImage capture = grabDesktopInternal();
+            if (capture == null) {
+               capture = new Robot().createScreenCapture(screenRect);
+            }
 
             // Delta check at quarter resolution for speed
             if (prevFrame != null && isDeltaSmall(prevFrame, capture)) {
@@ -313,7 +375,10 @@ public class ScreenCapture {
             long wait    = aligned + 16 - now;
             if (wait > 0 && wait < 16) Thread.sleep(wait);
 
-            BufferedImage capture = robot.createScreenCapture(screenRect);
+            BufferedImage capture = grabDesktopInternal();
+            if (capture == null) {
+               capture = new Robot().createScreenCapture(screenRect);
+            }
 
             int newW = (int) (capture.getWidth()  * resolutionScale);
             int newH = (int) (capture.getHeight() * resolutionScale);

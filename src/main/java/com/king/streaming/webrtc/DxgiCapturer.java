@@ -3,14 +3,26 @@ package com.king.streaming.webrtc;
 import com.king.streaming.api.ScreenCapturer;
 import com.king.util.AuditLogger;
 
-import java.awt.*;
+import java.awt.Rectangle;
+import java.awt.Robot;
+import java.awt.Toolkit;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferInt;
 import java.io.ByteArrayOutputStream;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.imageio.*;
 import javax.imageio.stream.ImageOutputStream;
+
+import com.sun.jna.Memory;
+import com.sun.jna.platform.win32.GDI32;
+import com.sun.jna.platform.win32.User32;
+import com.sun.jna.platform.win32.WinDef.HBITMAP;
+import com.sun.jna.platform.win32.WinDef.HDC;
+import com.sun.jna.platform.win32.WinDef.HWND;
+import com.sun.jna.platform.win32.WinGDI;
+import com.sun.jna.platform.win32.WinGDI.BITMAPINFO;
 
 /**
  * King of Lab — DXGI Desktop Duplication Capturer (Ultra Mode).
@@ -57,18 +69,58 @@ public class DxgiCapturer implements ScreenCapturer {
 
     private Thread producerThread;
 
-    // Robot shim — used when JNA/DXGI native is unavailable
-    private static Robot shimRobot;
+    // GDI shim — used when JNA/DXGI native is unavailable or fallback to GDI requested
+    private static HWND desktopWindow;
+    private static HDC windowDC;
+    private static HDC memDC;
+    private static HBITMAP hBitmap;
+    private static BITMAPINFO bmi;
+    private static BufferedImage gdiBuffer;
     private static Rectangle screenRect;
 
     static {
+        screenRect = new Rectangle(Toolkit.getDefaultToolkit().getScreenSize());
+        initGdiCapture();
+    }
+
+    private static void initGdiCapture() {
         try {
-            shimRobot = new Robot();
-            shimRobot.setAutoDelay(0);
-            screenRect = new Rectangle(Toolkit.getDefaultToolkit().getScreenSize());
-        } catch (AWTException e) {
-            shimRobot = null;
+            desktopWindow = User32.INSTANCE.GetDesktopWindow();
+            windowDC      = User32.INSTANCE.GetDC(desktopWindow);
+            memDC         = GDI32.INSTANCE.CreateCompatibleDC(windowDC);
+            
+            int width  = screenRect.width;
+            int height = screenRect.height;
+            
+            hBitmap = GDI32.INSTANCE.CreateCompatibleBitmap(windowDC, width, height);
+            GDI32.INSTANCE.SelectObject(memDC, hBitmap);
+            
+            bmi = new BITMAPINFO();
+            bmi.bmiHeader.biWidth = width;
+            bmi.bmiHeader.biHeight = -height; // top-down
+            bmi.bmiHeader.biPlanes = 1;
+            bmi.bmiHeader.biBitCount = 32;
+            bmi.bmiHeader.biCompression = WinGDI.BI_RGB;
+            
+            gdiBuffer = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        } catch (Throwable t) {
+            AuditLogger.logError("DxgiCapturer", "Failed to init GDI capture shim.");
         }
+    }
+
+    private static BufferedImage grabDesktopInternal() {
+        if (memDC == null) return null; // fallback if JNA not available
+        int width  = screenRect.width;
+        int height = screenRect.height;
+        
+        GDI32.INSTANCE.BitBlt(memDC, 0, 0, width, height, windowDC, 0, 0, GDI32.SRCCOPY);
+        
+        int[] pixels = ((DataBufferInt) gdiBuffer.getRaster().getDataBuffer()).getData();
+        Memory memory = new Memory((long) pixels.length * 4);
+        GDI32.INSTANCE.GetDIBits(windowDC, hBitmap, 0, height, memory, bmi, WinGDI.DIB_RGB_COLORS);
+        memory.read(0, pixels, 0, pixels.length);
+        
+        return gdiBuffer;
     }
 
     // Target FPS for producer thread (60 Hz)
@@ -92,7 +144,7 @@ public class DxgiCapturer implements ScreenCapturer {
         if (nativeOk) {
             AuditLogger.logSystem("[DXGI] Desktop Duplication initialized — GPU capture ACTIVE");
         } else {
-            AuditLogger.logSystem("[DXGI] Native DXGI unavailable — using cursor-free Robot shim at 60 FPS");
+            AuditLogger.logSystem("[DXGI] Native DXGI unavailable — using cursor-free GDI shim at 60 FPS");
         }
 
         producerThread = new Thread(this::producerLoop, "DxgiCapturer-Producer");
@@ -142,7 +194,7 @@ public class DxgiCapturer implements ScreenCapturer {
                 if (dxgiAvailable.get()) {
                     frame = captureViaDxgi();
                 } else {
-                    frame = captureViaRobotShim();
+                    frame = captureViaGdiShim();
                 }
 
                 if (frame != null) {
@@ -227,7 +279,7 @@ public class DxgiCapturer implements ScreenCapturer {
          * if the desktop hasn't updated — in that case return null so the
          * AtomicReference is not updated (natural frame-drop for static desktops).
          */
-        return captureViaRobotShim(); // shim until native DLL wired
+        return captureViaGdiShim(); // shim until native DLL wired
     }
 
     private void releaseDxgi() {
@@ -235,21 +287,20 @@ public class DxgiCapturer implements ScreenCapturer {
     }
 
     // -----------------------------------------------------------------------
-    // Robot shim — cursor-free, full-speed, no Base64
+    // GDI shim — cursor-free, full-speed, no Base64
     // -----------------------------------------------------------------------
 
     /**
-     * High-speed cursor-free capture using AWT Robot.
+     * High-speed cursor-free capture using JNA GDI.
      * Used when DXGI native is unavailable. Still participates in the
-     * AtomicReference frame-drop pipeline — the producer/consumer semantics
-     * are identical to the full DXGI path.
-     *
-     * Cursor: NOT drawn. drawMouseCursor() is intentionally absent.
+     * AtomicReference frame-drop pipeline.
      */
-    private byte[] captureViaRobotShim() {
-        if (shimRobot == null) return null;
+    private byte[] captureViaGdiShim() {
         try {
-            BufferedImage frame = shimRobot.createScreenCapture(screenRect);
+            BufferedImage frame = grabDesktopInternal();
+            if (frame == null) {
+                frame = new Robot().createScreenCapture(screenRect);
+            }
             return encodeJpeg(frame, JPEG_QUALITY);
         } catch (Exception e) {
             return null;

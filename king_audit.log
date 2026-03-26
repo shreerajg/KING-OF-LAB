@@ -272,3 +272,34 @@
 [2026-03-26 23:00:57] [SYSTEM] Switching Stream Mode to: LEGACY_CPU
 [2026-03-26 23:00:57] [ERROR] [UltraStream] Cannot enter synchronized block because "this.bOut" is null
 [2026-03-26 23:02:07] [DISCONNECT] Student disconnected: shree
+[2026-03-26 23:11:24] [SYSTEM] King of Lab v3.0 started
+[2026-03-26 23:11:24] [SYSTEM] Database initialised
+[2026-03-26 23:11:28] [LOGIN] admin logged in successfully
+[2026-03-26 23:11:28] [SYSTEM] King of Lab Admin started
+[2026-03-26 23:11:28] [SYSTEM] King Server listening on port 5555
+[2026-03-26 23:11:28] [SYSTEM] Ultra-Binary Stream Server listening on port 5556
+[2026-03-26 23:11:38] [SYSTEM] King of Lab v3.0 started
+[2026-03-26 23:11:38] [SYSTEM] Database initialised
+[2026-03-26 23:11:43] [LOGIN] shree logged in successfully
+[2026-03-26 23:11:44] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-26 23:11:44] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-26 23:11:45] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-26 23:15:10] [DISCONNECT] Student disconnected: shree
+[2026-03-26 23:21:37] [SYSTEM] King of Lab v3.0 started
+[2026-03-26 23:21:37] [SYSTEM] Database initialised
+[2026-03-26 23:21:50] [SYSTEM] King of Lab v3.0 started
+[2026-03-26 23:21:50] [SYSTEM] Database initialised
+[2026-03-26 23:21:57] [LOGIN] shree logged in successfully
+[2026-03-26 23:22:00] [LOGIN] admin logged in successfully
+[2026-03-26 23:22:00] [SYSTEM] King of Lab Admin started
+[2026-03-26 23:22:00] [SYSTEM] King Server listening on port 5555
+[2026-03-26 23:22:00] [SYSTEM] Ultra-Binary Stream Server listening on port 5556
+[2026-03-26 23:22:00] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-26 23:22:00] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-26 23:22:00] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-26 23:22:15] [SYSTEM] Switching Stream Mode to: ULTRA_WEBRTC
+[2026-03-26 23:22:15] [SYSTEM] Stream Mode switched to ULTRA_WEBRTC
+[2026-03-26 23:22:24] [SYSTEM] Switching Stream Mode to: LEGACY_CPU
+[2026-03-26 23:22:24] [SYSTEM] Stream Mode switched to LEGACY_CPU
+[2026-03-26 23:22:24] [ERROR] [UltraStream] Cannot enter synchronized block because "this.bOut" is null
+[2026-03-26 23:23:03] [DISCONNECT] Student disconnected: shree
