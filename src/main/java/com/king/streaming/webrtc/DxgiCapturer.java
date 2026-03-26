@@ -87,20 +87,25 @@ public class DxgiCapturer implements ScreenCapturer {
             desktopWindow = User32.INSTANCE.GetDesktopWindow();
             windowDC      = User32.INSTANCE.GetDC(desktopWindow);
             memDC         = GDI32.INSTANCE.CreateCompatibleDC(windowDC);
-            
+
             int width  = screenRect.width;
             int height = screenRect.height;
-            
+
+            // Use CreateCompatibleBitmap then BitBlt only.
+            // We do NOT call GetDIBits against the screen DC because on some
+            // Windows/driver combos GetDIBits momentarily hides the hardware
+            // cursor, causing visible flicker for the physical user.
             hBitmap = GDI32.INSTANCE.CreateCompatibleBitmap(windowDC, width, height);
             GDI32.INSTANCE.SelectObject(memDC, hBitmap);
-            
+
+            // BITMAPINFO — needed for reading pixels out of memDC (not screen DC)
             bmi = new BITMAPINFO();
-            bmi.bmiHeader.biWidth = width;
-            bmi.bmiHeader.biHeight = -height; // top-down
-            bmi.bmiHeader.biPlanes = 1;
-            bmi.bmiHeader.biBitCount = 32;
+            bmi.bmiHeader.biWidth     = width;
+            bmi.bmiHeader.biHeight    = -height; // negative = top-down
+            bmi.bmiHeader.biPlanes    = 1;
+            bmi.bmiHeader.biBitCount  = 32;
             bmi.bmiHeader.biCompression = WinGDI.BI_RGB;
-            
+
             gdiBuffer = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         } catch (Throwable t) {
             AuditLogger.logError("DxgiCapturer", "Failed to init GDI capture shim.");
@@ -108,17 +113,23 @@ public class DxgiCapturer implements ScreenCapturer {
     }
 
     private static BufferedImage grabDesktopInternal() {
-        if (memDC == null) return null; // fallback if JNA not available
+        if (memDC == null) return null;
         int width  = screenRect.width;
         int height = screenRect.height;
-        
+
+        // Step 1: BitBlt from screen DC → memory DC.
+        // BitBlt(SRCCOPY) on Windows 10/11 with DWM reads from the GPU
+        // composited buffer WITHOUT touching the hardware-cursor layer.
         GDI32.INSTANCE.BitBlt(memDC, 0, 0, width, height, windowDC, 0, 0, GDI32.SRCCOPY);
-        
-        int[] pixels = ((DataBufferInt) gdiBuffer.getRaster().getDataBuffer()).getData();
+
+        // Step 2: Read pixels from the MEMORY DC (not the screen DC).
+        // GetDIBits against memDC is safe — it is reading our own in-memory
+        // bitmap, not the live screen, so no cursor interaction happens.
+        int[]  pixels = ((DataBufferInt) gdiBuffer.getRaster().getDataBuffer()).getData();
         Memory memory = new Memory((long) pixels.length * 4);
-        GDI32.INSTANCE.GetDIBits(windowDC, hBitmap, 0, height, memory, bmi, WinGDI.DIB_RGB_COLORS);
+        GDI32.INSTANCE.GetDIBits(memDC, hBitmap, 0, height, memory, bmi, WinGDI.DIB_RGB_COLORS);
         memory.read(0, pixels, 0, pixels.length);
-        
+
         return gdiBuffer;
     }
 
