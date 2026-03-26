@@ -334,3 +334,38 @@
 [2026-03-26 23:38:07] [SYSTEM] Switching Stream Mode to: LEGACY_CPU
 [2026-03-26 23:38:07] [SYSTEM] Stream Mode switched to LEGACY_CPU
 [2026-03-26 23:38:07] [ERROR] [UltraStream] Cannot enter synchronized block because "this.bOut" is null
+[2026-03-26 23:50:10] [SYSTEM] King of Lab v3.0 started
+[2026-03-26 23:50:10] [SYSTEM] Database initialised
+[2026-03-26 23:50:26] [LOGIN] admin logged in successfully
+[2026-03-26 23:50:26] [SYSTEM] King of Lab Admin started
+[2026-03-26 23:50:26] [SYSTEM] King Server listening on port 5555
+[2026-03-26 23:50:26] [SYSTEM] Ultra-Binary Stream Server listening on port 5556
+[2026-03-26 23:50:40] [SYSTEM] King of Lab v3.0 started
+[2026-03-26 23:50:40] [SYSTEM] Database initialised
+[2026-03-26 23:50:44] [LOGIN] shree logged in successfully
+[2026-03-26 23:50:44] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-26 23:50:44] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-26 23:50:45] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-26 23:51:06] [SYSTEM] Switching Stream Mode to: ULTRA_WEBRTC
+[2026-03-26 23:51:06] [SYSTEM] Stream Mode switched to ULTRA_WEBRTC
+[2026-03-26 23:51:12] [SYSTEM] Switching Stream Mode to: LEGACY_CPU
+[2026-03-26 23:51:12] [SYSTEM] Stream Mode switched to LEGACY_CPU
+[2026-03-26 23:51:12] [ERROR] [UltraStream] Cannot enter synchronized block because "this.bOut" is null
+[2026-03-27 00:07:59] [SYSTEM] King of Lab v3.0 started
+[2026-03-27 00:07:59] [SYSTEM] Database initialised
+[2026-03-27 00:08:06] [SYSTEM] King of Lab v3.0 started
+[2026-03-27 00:08:06] [SYSTEM] Database initialised
+[2026-03-27 00:08:11] [LOGIN] admin logged in successfully
+[2026-03-27 00:08:11] [SYSTEM] King of Lab Admin started
+[2026-03-27 00:08:11] [SYSTEM] King Server listening on port 5555
+[2026-03-27 00:08:11] [SYSTEM] Ultra-Binary Stream Server listening on port 5556
+[2026-03-27 00:08:28] [LOGIN] shree logged in successfully
+[2026-03-27 00:08:29] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-27 00:08:30] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-27 00:08:30] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-27 00:08:49] [SYSTEM] Admin dashboard closed
+[2026-03-27 00:09:03] [SYSTEM] Switching Stream Mode to: ULTRA_WEBRTC
+[2026-03-27 00:09:03] [SYSTEM] Stream Mode switched to ULTRA_WEBRTC
+[2026-03-27 00:09:14] [SYSTEM] Admin dashboard closed
+[2026-03-27 00:09:19] [ERROR] [BinaryStream] Connection reset
+[2026-03-27 00:09:19] [DISCONNECT] Student disconnected: shree

@@ -225,7 +225,7 @@ public class ScreenCapture {
 
             BufferedImage capture = grabDesktopInternal();
             if (capture == null) {
-               capture = new Robot().createScreenCapture(screenRect);
+               capture = new BufferedImage(screenRect.width, screenRect.height, BufferedImage.TYPE_INT_RGB);
             }
 
             // Delta check at quarter resolution for speed
