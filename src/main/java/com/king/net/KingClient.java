@@ -18,6 +18,9 @@ import com.king.streaming.api.VideoEncoder;
 import com.king.streaming.webrtc.WebRtcClient;
 import com.king.streaming.webrtc.DxgiCapturer;
 import com.king.streaming.webrtc.NvidiaEncoder;
+import com.king.streaming.webrtc.H264SoftwareEncoder;
+import java.awt.Dimension;
+import java.awt.Toolkit;
 
 /**
  * King of Lab — KingClient (network connection from student to admin).
@@ -207,51 +210,129 @@ public class KingClient {
     }
 
     // -----------------------------------------------------------------------
-    // Ultra Low Latency Pipeline (Binary TCP Bypass)
+    // Ultra Low Latency Pipeline — DXGI Capture + H.264 Encoding + Binary TCP
     // -----------------------------------------------------------------------
 
-    private Socket binarySocket;
+    private Socket          binarySocket;
     private DataOutputStream bOut;
 
+    // Ultra mode components (non-null while ultra stream is active)
+    private DxgiCapturer       dxgiCapturer;
+    private H264SoftwareEncoder h264Encoder;
+
+    /**
+     * Starts the ultra binary stream pipeline:
+     *   DxgiCapturer (60 FPS, cursor-free, AtomicReference frame-drop)
+     *   → H264SoftwareEncoder (NVENC/AMF/QSV/libx264/JPEG passthrough)
+     *   → Binary TCP socket (port SERVER_PORT+1)
+     *
+     * Only the LATEST frame from DxgiCapturer is ever transmitted.
+     * If the capturer has not produced a new frame since last poll, the
+     * consumer skips that iteration (zero-backlog, zero-lag guarantee).
+     *
+     * Fallback: if DxgiCapturer.isSupported() returns false (non-Windows),
+     * the mode reverts to LEGACY_CPU automatically.
+     */
     private void startUltraBinaryStream() {
+        // Guard: only supported on Windows 10+
+        DxgiCapturer capturer = new DxgiCapturer();
+        if (!capturer.isSupported()) {
+            AuditLogger.logSystem("[UltraStream] DXGI not supported on this OS — reverting to LEGACY_CPU");
+            currentMode = StreamMode.LEGACY_CPU;
+            startScreenCapture();
+            return;
+        }
+
+        // Resolve screen dimensions for the encoder
+        Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
+        int w = screen.width;
+        int h = screen.height;
+
+        // Initialize encoder first so it warms up the FFmpeg probe while capturer starts
+        H264SoftwareEncoder encoder = new H264SoftwareEncoder();
+        encoder.initialize(w, h, Config.FPS_ULTRA, 3_000_000); // 3 Mbps — tuned for LAN
+
+        // Start the 60 FPS producer thread
+        capturer.startCapture();
+
+        // Store references for cleanup
+        dxgiCapturer = capturer;
+        h264Encoder  = encoder;
+
+        AuditLogger.logSystem("[UltraStream] DXGI + H.264 pipeline started → " + adminIp + ":" + Config.BINARY_STREAM_PORT);
+
         new Thread(() -> {
             try {
-                System.out.println("[Ultra-Stream] Connecting binary socket to " + adminIp + ":5556");
                 binarySocket = new Socket();
-                binarySocket.connect(new InetSocketAddress(adminIp, Config.SERVER_PORT + 1), 5000);
-                bOut = new DataOutputStream(new BufferedOutputStream(binarySocket.getOutputStream()));
-                
+                binarySocket.setTcpNoDelay(true); // disable Nagle — minimise TCP latency
+                binarySocket.connect(new InetSocketAddress(adminIp, Config.BINARY_STREAM_PORT), 5000);
+                bOut = new DataOutputStream(new BufferedOutputStream(binarySocket.getOutputStream(), 256_000));
+
+                byte[] nameBytes = studentUser.getUsername().getBytes();
+                int    adaptMs   = 0; // adaptive sleep (ms) updated each frame
+
                 while (currentMode == StreamMode.ULTRA_WEBRTC && running && !binarySocket.isClosed()) {
-                    byte[] jpeg = ScreenCapture.captureAsBytes(1.0, 0.70f);
-                    if (jpeg != null) {
-                        synchronized (bOut) {
-                            byte[] nameBytes = studentUser.getUsername().getBytes();
-                            bOut.writeInt(nameBytes.length);
-                            bOut.write(nameBytes);
-                            bOut.writeInt(jpeg.length);
-                            bOut.write(jpeg);
-                            bOut.flush();
+
+                    // ── Frame-Drop semantics ───────────────────────────────
+                    // getNextFrame() reads AND clears the AtomicReference.
+                    // If null: capturer has not produced a new frame this tick
+                    // — skip encode+send (no stale frame ever queued).
+                    byte[] rawFrame = capturer.getNextFrame();
+
+                    if (rawFrame != null) {
+                        // Encode via H.264 pipeline (or JPEG passthrough)
+                        byte[] payload = encoder.encodeFrame(rawFrame);
+
+                        if (payload != null) {
+                            // Wire protocol: [nameLenInt][nameBytes][payloadLenInt][payloadBytes]
+                            synchronized (bOut) {
+                                bOut.writeInt(nameBytes.length);
+                                bOut.write(nameBytes);
+                                bOut.writeInt(payload.length);
+                                bOut.write(payload);
+                                bOut.flush();
+                            }
+                            PerformanceMonitor.recordFrame();
                         }
-                        PerformanceMonitor.recordFrame();
                     }
-                    Thread.sleep(1000 / Config.FPS_HIGH);
+
+                    // Adaptive sleep: use AdaptiveStreamController (CPU-aware)
+                    adaptMs = (int) AdaptiveStreamController.getIntervalMs();
+                    // Clamp to ultra FPS ceiling
+                    int minMs = 1000 / Config.FPS_ULTRA;
+                    if (adaptMs < minMs) adaptMs = minMs;
+                    Thread.sleep(adaptMs);
                 }
+
             } catch (Exception e) {
                 AuditLogger.logError("UltraStream", e.getMessage());
                 currentMode = StreamMode.LEGACY_CPU;
-                startScreenCapture();
+                stopUltraBinaryStream();
+                startScreenCapture(); // graceful fallback to AWT Robot
             } finally {
                 stopUltraBinaryStream();
             }
         }, "KingClient-UltraStream").start();
     }
 
+    /** Tears down the ultra pipeline cleanly. Safe to call multiple times. */
     private void stopUltraBinaryStream() {
+        // Stop DXGI producer
+        if (dxgiCapturer != null) {
+            try { dxgiCapturer.stopCapture(); } catch (Exception ignored) {}
+            dxgiCapturer = null;
+        }
+        // Shutdown H.264 encoder (closes FFmpeg pipe if active)
+        if (h264Encoder != null) {
+            try { h264Encoder.shutdown(); } catch (Exception ignored) {}
+            h264Encoder = null;
+        }
+        // Close binary socket
         try {
             if (binarySocket != null) binarySocket.close();
-            binarySocket = null;
-            bOut = null;
         } catch (IOException ignored) {}
+        binarySocket = null;
+        bOut         = null;
     }
 
     // -----------------------------------------------------------------------

@@ -8,7 +8,6 @@ import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
 import javafx.application.Platform;
-import javafx.scene.image.Image;
 
 /**
  * King of Lab — upgraded KingServer.
@@ -176,32 +175,76 @@ public class KingServer {
         }, "KingServer-BinaryStream").start();
     }
 
+    /**
+     * Accepts binary stream connections from students in ULTRA mode.
+     * Each connection gets its own handler that implements the latest-frame-only
+     * dispatch pattern: raw bytes are written into an AtomicReference by the
+     * reader thread; a separate 30 FPS dispatch loop reads+clears the ref and
+     * calls Platform.runLater — preventing stale frames and JavaFX queue floods.
+     */
     private void handleBinaryStream(Socket socket) {
-        try (DataInputStream dis = new DataInputStream(socket.getInputStream())) {
+        // Ref holds the latest received payload for this connection
+        java.util.concurrent.atomic.AtomicReference<byte[]> latestPayload =
+                new java.util.concurrent.atomic.AtomicReference<>(null);
+        // Name discovered from first packet
+        java.util.concurrent.atomic.AtomicReference<String> clientNameRef =
+                new java.util.concurrent.atomic.AtomicReference<>("?");
+
+        // ── 30 FPS Dispatch thread ─────────────────────────────────────────
+        // Runs alongside the reader; always dispatches only the LATEST frame.
+        // At 100+ clients this caps UI events at 30 per client/s, keeping
+        // JavaFX responsive.
+        Thread dispatchThread = new Thread(() -> {
+            while (running && !socket.isClosed() && !Thread.currentThread().isInterrupted()) {
+                try {
+                    byte[] payload = latestPayload.getAndSet(null);
+                    if (payload != null) {
+                        final String name   = clientNameRef.get();
+                        final byte[] pBytes = payload;
+                        // Decode on render thread — Image constructor is non-blocking for byte[]
+                        Platform.runLater(() -> {
+                            try {
+                                javafx.scene.image.Image image =
+                                    new javafx.scene.image.Image(new ByteArrayInputStream(pBytes));
+                                if (screenListener instanceof BinaryScreenListener) {
+                                    ((BinaryScreenListener) screenListener).onBinaryUpdate(name, image);
+                                }
+                            } catch (Exception ignored) {}
+                        });
+                    }
+                    Thread.sleep(33); // ~30 FPS UI cap — prevents JavaFX queue saturation
+                } catch (InterruptedException e) {
+                    break;
+                }
+            }
+        }, "BinaryStream-Dispatch-" + socket.getRemoteSocketAddress());
+        dispatchThread.setDaemon(true);
+        dispatchThread.start();
+
+        // ── Reader thread (this thread) ────────────────────────────────────
+        // Reads frames as fast as they arrive; overwrites latestPayload each time
+        // (frame-drop: consumer always gets the freshest data).
+        try (DataInputStream dis = new DataInputStream(new BufferedInputStream(socket.getInputStream(), 256_000))) {
             while (running && !socket.isClosed()) {
-                // Header: [Name Length (int)][Name (UTF)][Payload Length (int)][Payload (bytes)]
+                // Header: [Name Length (int)][Name (UTF-8 bytes)][Payload Length (int)][Payload (bytes)]
                 int nameLen = dis.readInt();
                 byte[] nameBytes = new byte[nameLen];
                 dis.readFully(nameBytes);
                 String studentName = new String(nameBytes);
-                
+                clientNameRef.set(studentName);
+
                 int payloadLen = dis.readInt();
                 byte[] payload = new byte[payloadLen];
                 dis.readFully(payload);
-                
-                // Directly convert JPEG bytes to Image and notify listener
-                Image image = new Image(new ByteArrayInputStream(payload));
-                // We use a custom update path to bypass Base64 decoding in the UI
-                Platform.runLater(() -> {
-                    if (screenListener instanceof BinaryScreenListener) {
-                        ((BinaryScreenListener) screenListener).onBinaryUpdate(studentName, image);
-                    }
-                });
+
+                // Frame-drop: overwrite previous unread frame
+                latestPayload.set(payload);
             }
         } catch (EOFException ignored) {
         } catch (Exception e) {
             AuditLogger.logError("BinaryStream", e.getMessage());
         } finally {
+            dispatchThread.interrupt();
             try { socket.close(); } catch (IOException ignored) {}
         }
     }

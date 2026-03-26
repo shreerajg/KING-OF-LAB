@@ -14,10 +14,16 @@ public class Config {
     public static final int    AI_TIMEOUT_MS = 60_000;      // 60-second timeout for AI response
 
     // ===== STREAMING CONFIGURATION =====
+    public static final int    FPS_ULTRA   = 60;   // DXGI/GPU ultra mode (60 FPS producer)
     public static final int    FPS_HIGH    = 35;   // low CPU load
     public static final int    FPS_MEDIUM  = 25;   // medium load
     public static final int    FPS_LOW     = 15;   // high load
     public static final int    FPS_AI_MODE = 10;   // while AI is active
+
+    // ===== NETWORK PORTS =====
+    // Control channel: SERVER_PORT (5555) — JSON text commands + heartbeat
+    // Ultra binary stream: SERVER_PORT + 1 (5556) — raw JPEG / H.264 binary frames
+    public static final int    BINARY_STREAM_PORT = SERVER_PORT + 1;
 
     // ===== HEARTBEAT =====
     public static final int    HEARTBEAT_INTERVAL_SEC = 3;

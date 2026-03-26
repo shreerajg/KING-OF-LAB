@@ -46,6 +46,7 @@ public class AdminDashboard {
     private static Label  connectedLabel;
     private static Label  aiStatusLabel;
     private static Button ultraWebRtcBtn;
+    private static Button standardModeBtn;
     private static boolean isUltraActive = false;
     private static boolean isSharingScreen = false;
     private static Button  shareScreenBtn;
@@ -245,8 +246,9 @@ public class AdminDashboard {
             buildCmdGroup("AI & SYSTEM", 
                 ribbonBtn("🤖 Toggle AI", ACCENT_COLOR, () -> toggleAi(user.getUsername()))
             ),
-            buildCmdGroup("PIPELINE", 
-                ribbonBtn("🚄 Ultra WebRTC: OFF", PRIMARY_COLOR, () -> toggleUltraStream())
+            buildCmdGroup("PIPELINE",
+                buildStandardModeBtn(),
+                buildUltraModeBtn()
             ),
             buildCmdGroup("TOOLS", 
                 ribbonBtn("📸 Screenshot", ACCENT_COLOR,  () -> captureAllScreenshots(stage)),
@@ -298,9 +300,8 @@ public class AdminDashboard {
         btn.setOnMouseExited(e -> { btn.setOpacity(1.0); glow.setRadius(10); glow.setColor(Color.web(glowColor, 0.4)); });
         btn.setOnAction(e -> { action.run(); appendActivity("COMMAND", "Executed: " + text); });
         
-        if (text.contains("Toggle AI")) aiToggleBtn = btn;
-        if (text.contains("Ultra WebRTC")) ultraWebRtcBtn = btn;
-        if (text.contains("Share Screen")) shareScreenBtn = btn;
+        if (text.contains("Toggle AI"))    aiToggleBtn   = btn;
+        if (text.contains("Share Screen"))  shareScreenBtn = btn;
         
         return btn;
     }
@@ -341,18 +342,59 @@ public class AdminDashboard {
         t.start();
     }
 
-    private static void toggleUltraStream() {
-        isUltraActive = !isUltraActive;
-        String mode = isUltraActive ? "ULTRA_WEBRTC" : "LEGACY_CPU";
-        server.broadcast(new CommandPacket(CommandPacket.Type.STREAM_MODE, "ADMIN", mode));
-        
-        if (ultraWebRtcBtn != null) {
-            ultraWebRtcBtn.setText(isUltraActive ? "🚄 WebRTC: ON" : "🚄 WebRTC: OFF");
-            ultraWebRtcBtn.setStyle(ultraWebRtcBtn.getStyle() + "-fx-border-color: " + (isUltraActive ? SUCCESS_COLOR : DANGER_COLOR) + ";");
+    // -----------------------------------------------------------------------
+    // Capture Mode: Standard (AWT Robot) vs Ultra (DXGI + H.264)
+    // -----------------------------------------------------------------------
+
+    private static Button buildStandardModeBtn() {
+        Button btn = ribbonBtn("⚡ Standard (AWT)", SUCCESS_COLOR, () -> activateStandardMode());
+        standardModeBtn = btn;
+        // Default: standard mode active
+        btn.setStyle(btn.getStyle() + "-fx-border-color: " + SUCCESS_COLOR + ";");
+        return btn;
+    }
+
+    private static Button buildUltraModeBtn() {
+        Button btn = ribbonBtn("🚀 Ultra (DXGI)", PRIMARY_COLOR, () -> activateUltraMode());
+        ultraWebRtcBtn = btn;
+        return btn;
+    }
+
+    /** Switches all connected students to LEGACY_CPU (AWT Robot) mode. */
+    private static void activateStandardMode() {
+        if (!isUltraActive) return; // already standard
+        isUltraActive = false;
+        server.broadcast(new CommandPacket(CommandPacket.Type.STREAM_MODE, "ADMIN", "LEGACY_CPU"));
+        updateCaptureModeButtons();
+        appendActivity("PIPELINE", "Mode → Standard (AWT Robot CPU capture)");
+        AuditLogger.logSystem("Stream Mode → LEGACY_CPU");
+    }
+
+    /** Switches all connected students to ULTRA_WEBRTC (DXGI + H.264) mode. */
+    private static void activateUltraMode() {
+        if (isUltraActive) return; // already ultra
+        isUltraActive = true;
+        server.broadcast(new CommandPacket(CommandPacket.Type.STREAM_MODE, "ADMIN", "ULTRA_WEBRTC"));
+        updateCaptureModeButtons();
+        appendActivity("PIPELINE", "Mode → Ultra (DXGI + H.264 @60FPS, cursor-free)");
+        AuditLogger.logSystem("Stream Mode → ULTRA_WEBRTC (DXGI+H264)");
+    }
+
+
+
+    private static void updateCaptureModeButtons() {
+        String activeStyle   = "-fx-border-color: " + SUCCESS_COLOR + "; -fx-border-width: 2;";
+        String inactiveStyle = "-fx-border-color: rgba(255,255,255,0.2); -fx-border-width: 1.5;";
+        if (standardModeBtn != null) {
+            standardModeBtn.setStyle(
+                standardModeBtn.getStyle().replaceAll("-fx-border-color:[^;]+;", "").replaceAll("-fx-border-width:[^;]+;", "")
+                + (isUltraActive ? inactiveStyle : activeStyle));
         }
-        
-        appendActivity("PIPELINE", "Mode switched to " + mode);
-        AuditLogger.logSystem("Stream Mode switched to " + mode);
+        if (ultraWebRtcBtn != null) {
+            ultraWebRtcBtn.setStyle(
+                ultraWebRtcBtn.getStyle().replaceAll("-fx-border-color:[^;]+;", "").replaceAll("-fx-border-width:[^;]+;", "")
+                + (isUltraActive ? activeStyle : inactiveStyle));
+        }
     }
 
 
