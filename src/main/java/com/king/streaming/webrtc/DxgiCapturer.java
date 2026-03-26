@@ -4,7 +4,6 @@ import com.king.streaming.api.ScreenCapturer;
 import com.king.util.AuditLogger;
 
 import java.awt.Rectangle;
-import java.awt.Robot;
 import java.awt.Toolkit;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
@@ -299,7 +298,7 @@ public class DxgiCapturer implements ScreenCapturer {
         try {
             BufferedImage frame = grabDesktopInternal();
             if (frame == null) {
-                frame = new Robot().createScreenCapture(screenRect);
+                frame = new BufferedImage(screenRect.width, screenRect.height, BufferedImage.TYPE_INT_RGB);
             }
             return encodeJpeg(frame, JPEG_QUALITY);
         } catch (Exception e) {

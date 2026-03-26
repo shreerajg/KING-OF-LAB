@@ -139,8 +139,8 @@ public class ScreenCapture {
 
             BufferedImage capture = grabDesktopInternal();
             if (capture == null) {
-               // Hard fallback just in case
-               capture = new Robot().createScreenCapture(screenRect);
+               // If GDI fails, return a blank frame rather than using flickering Robot
+               capture = new BufferedImage(screenRect.width, screenRect.height, BufferedImage.TYPE_INT_RGB);
             }
 
             int newW = (int) (capture.getWidth()  * resolutionScale);
@@ -174,7 +174,7 @@ public class ScreenCapture {
         try {
             BufferedImage capture = grabDesktopInternal();
             if (capture == null) {
-               capture = new Robot().createScreenCapture(screenRect);
+               capture = new BufferedImage(screenRect.width, screenRect.height, BufferedImage.TYPE_INT_RGB);
             }
             int newW = (int) (capture.getWidth()  * resolutionScale);
             int newH = (int) (capture.getHeight() * resolutionScale);
@@ -377,7 +377,7 @@ public class ScreenCapture {
 
             BufferedImage capture = grabDesktopInternal();
             if (capture == null) {
-               capture = new Robot().createScreenCapture(screenRect);
+               capture = new BufferedImage(screenRect.width, screenRect.height, BufferedImage.TYPE_INT_RGB);
             }
 
             int newW = (int) (capture.getWidth()  * resolutionScale);
