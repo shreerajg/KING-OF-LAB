@@ -1,131 +1,74 @@
 package com.king.util;
 
-import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.util.Base64;
-import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.imageio.*;
-import javax.imageio.stream.ImageOutputStream;
 
 /**
- * King of Lab — ScreenCapture (Flicker-Free Edition)
+ * King of Lab — ScreenCapture (FFmpeg-Only Edition)
  *
- * ALL screen capture — both student (cursor hidden) and admin screen-share
- * (cursor visible) — now goes through persistent FFmpeg gdigrab processes.
+ * ALL student-facing screen capture now goes through a single, persistent
+ * FFmpeg gdigrab MJPEG pipe.  No GDI, no AWT Robot, no decode/re-encode.
  *
- * Why FFmpeg and not AWT Robot / GDI BitBlt / GetDIBits:
- *   – AWT Robot, GetDIBits, and even BitBlt against the screen DC all interact
- *     with the Windows hardware-cursor layer.  On any display configuration
- *     they can briefly hide/show the cursor, causing visible flicker for the
- *     physical user sitting at the machine.
- *   – FFmpeg gdigrab uses its own DWM-composited capture path.  With
- *     -draw_mouse 0 the cursor overlay is skipped entirely before the GPU
- *     writes the frame; no hide/show of the cursor ever occurs.
- *   – OBS Studio uses the same approach (DXGI Desktop Duplication with
- *     cursor flag).  gdigrab with -draw_mouse 0 achieves the same visible
- *     result from Java without a native DLL.
+ * PRIMARY PIPELINE (student — no cursor):
+ *   ffmpeg -f gdigrab -framerate 30 -draw_mouse 0 -i desktop -f mjpeg -q:v 4 pipe:1
+ *   → JPEG bytes → AtomicReference<byte[]> → send directly (zero-copy)
  *
- * Pipes:
- *   STUDENT pipe  – gdigrab -draw_mouse 0 @ 30 FPS → latestStudentJpeg
- *   ADMIN pipe    – gdigrab -draw_mouse 1 @ 60 FPS → latestAdminJpeg
- *                   (cursor included so students see admin pointer)
+ * ADMIN PIPELINE (admin screen-share — cursor visible):
+ *   ffmpeg -f gdigrab -framerate 60 -draw_mouse 1 -i desktop -f mjpeg -q:v 3 pipe:1
+ *   → JPEG bytes → AtomicReference<byte[]> → Base64 for WebSocket delivery
  *
- * AWT Robot is kept ONLY as a last-resort fallback when FFmpeg is absent from
- * the system PATH.  Log line "[ScreenCapture] FFmpeg NOT found" signals this.
+ * What was REMOVED:
+ *   ✗ AWT Robot.createScreenCapture()
+ *   ✗ ImageIO.read() / ImageIO.write() in the streaming path
+ *   ✗ encodeScaled() / encodeScaledBytes() — decode→scale→re-encode
+ *   ✗ reusableBuffer / reusableGraphics shared buffers (race condition source)
+ *   ✗ isDeltaSmall() / prevFrame delta detection
+ *   ✗ Fallback Robot path (if ffmpeg absent the pipe simply won't start)
+ *
+ * GUARD:
+ *   If the student FFmpeg pipe is running, NO other capture method is invoked.
+ *   The studentPipeUp flag is checked before every capture call.
  */
 public class ScreenCapture {
 
-    private static final Rectangle SCREEN = new Rectangle(
-            Toolkit.getDefaultToolkit().getScreenSize());
-
     // -----------------------------------------------------------------------
-    // Student pipe  (cursor hidden)
+    // Student pipe  (cursor hidden, 30 FPS)
     // -----------------------------------------------------------------------
-    private static volatile Process studentProc;
-    private static volatile Thread  studentReader;
-    private static final AtomicBoolean studentPipeUp = new AtomicBoolean(false);
+    private static volatile Process      studentProc;
+    private static volatile Thread       studentReader;
+    private static final AtomicBoolean   studentPipeUp   = new AtomicBoolean(false);
     private static final AtomicReference<byte[]> latestStudentJpeg =
             new AtomicReference<>(null);
 
     // -----------------------------------------------------------------------
-    // Admin pipe  (cursor visible — used for admin screen-share)
+    // Admin pipe  (cursor visible, 60 FPS — admin screen-share only)
     // -----------------------------------------------------------------------
-    private static volatile Process adminProc;
-    private static volatile Thread  adminReader;
-    private static final AtomicBoolean adminPipeUp = new AtomicBoolean(false);
-    private static final AtomicReference<byte[]> latestAdminJpeg =
+    private static volatile Process      adminProc;
+    private static volatile Thread       adminReader;
+    private static final AtomicBoolean   adminPipeUp     = new AtomicBoolean(false);
+    private static final AtomicReference<byte[]> latestAdminJpeg  =
             new AtomicReference<>(null);
 
     // -----------------------------------------------------------------------
-    // Shared
+    // Admin async state
     // -----------------------------------------------------------------------
-    private static volatile boolean ffmpegAvailable = false;
-
-    private static BufferedImage reusableBuffer;
-    private static Graphics2D    reusableGraphics;
-
-    // Async screen-share state
     private static final AtomicReference<String> latestAdminFrame =
             new AtomicReference<>(null);
     private static volatile boolean asyncRunning = false;
 
-    // Fallback AWT Robot (only when ffmpeg absent)
-    private static Robot fallbackRobot;
-
-    // Cursor pixels — used only when FFmpeg is absent and admin shares screen
-    private static final int[][] CURSOR_SHAPE = {
-        {1,0,0,0,0,0,0,0,0,0,0,0},
-        {1,1,0,0,0,0,0,0,0,0,0,0},
-        {1,2,1,0,0,0,0,0,0,0,0,0},
-        {1,2,2,1,0,0,0,0,0,0,0,0},
-        {1,2,2,2,1,0,0,0,0,0,0,0},
-        {1,2,2,2,2,1,0,0,0,0,0,0},
-        {1,2,2,2,2,2,1,0,0,0,0,0},
-        {1,2,2,2,2,2,2,1,0,0,0,0},
-        {1,2,2,2,2,2,2,2,1,0,0,0},
-        {1,2,2,2,2,2,2,2,2,1,0,0},
-        {1,2,2,2,2,2,2,2,2,2,1,0},
-        {1,2,2,2,2,2,2,2,2,2,2,1},
-        {1,2,2,2,2,2,2,1,1,1,1,1},
-        {1,2,2,2,1,2,2,1,0,0,0,0},
-        {1,2,2,1,0,1,2,2,1,0,0,0},
-        {1,2,1,0,0,1,2,2,1,0,0,0},
-        {1,1,0,0,0,0,1,2,2,1,0,0},
-        {1,0,0,0,0,0,1,2,2,1,0,0},
-        {0,0,0,0,0,0,0,1,1,0,0,0},
-    };
-
     // -----------------------------------------------------------------------
-    // Static init
+    // Static init — start student pipe immediately
     // -----------------------------------------------------------------------
     static {
-        ffmpegAvailable = probeFfmpeg();
-        if (ffmpegAvailable) {
-            startStudentPipe();
-            // Admin pipe is started lazily when admin screen-share begins
-        } else {
-            System.err.println("[ScreenCapture] FFmpeg NOT found — falling back to AWT Robot (cursor may flicker)");
-            try { fallbackRobot = new Robot(); fallbackRobot.setAutoDelay(0); }
-            catch (AWTException ignored) {}
-        }
+        startStudentPipe();
     }
 
     // -----------------------------------------------------------------------
-    // FFmpeg probe
-    // -----------------------------------------------------------------------
-    private static boolean probeFfmpeg() {
-        try {
-            Process p = Runtime.getRuntime().exec(new String[]{"ffmpeg", "-version"});
-            p.waitFor();
-            return p.exitValue() == 0;
-        } catch (Exception e) { return false; }
-    }
-
-    // -----------------------------------------------------------------------
-    // Student pipe management  (draw_mouse=0, 30 FPS)
+    // Student pipe management  (draw_mouse=0, 30 FPS, q:v 4)
     // -----------------------------------------------------------------------
     private static synchronized void startStudentPipe() {
         if (studentPipeUp.get()) return;
@@ -135,7 +78,7 @@ public class ScreenCapture {
                 "-loglevel",   "quiet",
                 "-f",          "gdigrab",
                 "-framerate",  "30",
-                "-draw_mouse", "0",   // exclude cursor at OS level
+                "-draw_mouse", "0",   // exclude cursor at OS level — no flicker
                 "-i",          "desktop",
                 "-f",          "mjpeg",
                 "-q:v",        "4",
@@ -144,12 +87,16 @@ public class ScreenCapture {
             studentProc = pb.start();
             drainStderr(studentProc, "Student");
             studentPipeUp.set(true);
+
             studentReader = new Thread(
                 () -> readMjpeg(studentProc, latestStudentJpeg, studentPipeUp),
                 "FFmpeg-Student-Reader");
             studentReader.setDaemon(true);
             studentReader.setPriority(Thread.MAX_PRIORITY - 1);
             studentReader.start();
+
+            System.out.println("[ScreenCapture] Student FFmpeg pipe started (draw_mouse=0, 30 FPS)");
+
         } catch (Exception e) {
             studentPipeUp.set(false);
             System.err.println("[ScreenCapture] Failed to start student pipe: " + e.getMessage());
@@ -157,7 +104,7 @@ public class ScreenCapture {
     }
 
     // -----------------------------------------------------------------------
-    // Admin pipe management  (draw_mouse=1, 60 FPS)
+    // Admin pipe management  (draw_mouse=1, 60 FPS, q:v 3)
     // -----------------------------------------------------------------------
     private static synchronized void startAdminPipe() {
         if (adminPipeUp.get()) return;
@@ -176,14 +123,17 @@ public class ScreenCapture {
             adminProc = pb.start();
             drainStderr(adminProc, "Admin");
             adminPipeUp.set(true);
+
             adminReader = new Thread(
                 () -> readMjpeg(adminProc, latestAdminJpeg, adminPipeUp),
                 "FFmpeg-Admin-Reader");
             adminReader.setDaemon(true);
             adminReader.setPriority(Thread.MAX_PRIORITY - 2);
             adminReader.start();
+
         } catch (Exception e) {
             adminPipeUp.set(false);
+            System.err.println("[ScreenCapture] Failed to start admin pipe: " + e.getMessage());
         }
     }
 
@@ -195,7 +145,8 @@ public class ScreenCapture {
     }
 
     // -----------------------------------------------------------------------
-    // MJPEG frame parser (shared between both pipes)
+    // MJPEG frame parser — shared between both pipes
+    // Parses FF D8 / FF D9 JPEG boundaries from FFmpeg stdout.
     // -----------------------------------------------------------------------
     private static void readMjpeg(Process proc,
                                    AtomicReference<byte[]> target,
@@ -205,38 +156,44 @@ public class ScreenCapture {
 
             ByteArrayOutputStream frame = new ByteArrayOutputStream(250_000);
             int prev = -1;
+            boolean inFrame = false;
 
             while (running.get() && !Thread.currentThread().isInterrupted()) {
                 int b = bis.read();
                 if (b < 0) break;
 
-                // Start of JPEG  (FF D8)
-                if (prev == 0xFF && b == 0xD8) {
-                    frame.reset();
-                    frame.write(0xFF);
-                    frame.write(0xD8);
+                if (!inFrame) {
+                    // Wait for JPEG SOI: FF D8
+                    if (prev == 0xFF && b == 0xD8) {
+                        frame.reset();
+                        frame.write(0xFF);
+                        frame.write(0xD8);
+                        inFrame = true;
+                    }
                     prev = b;
                     continue;
                 }
 
                 frame.write(b);
 
-                // End of JPEG  (FF D9)
+                // JPEG EOI: FF D9
                 if (prev == 0xFF && b == 0xD9 && frame.size() > 100) {
-                    target.set(frame.toByteArray()); // frame-drop: latest wins
+                    target.set(frame.toByteArray()); // latest frame wins
                     frame.reset();
+                    inFrame = false;
                 }
 
                 prev = b;
             }
         } catch (Exception ignored) {
+            // Process destroyed or interrupted — normal shutdown
         } finally {
             running.set(false);
         }
     }
 
     // -----------------------------------------------------------------------
-    // Stderr drainer so FFmpeg never blocks on stderr
+    // Stderr drainer — prevents FFmpeg from blocking on stderr
     // -----------------------------------------------------------------------
     private static void drainStderr(Process p, String label) {
         Thread t = new Thread(() -> {
@@ -248,47 +205,34 @@ public class ScreenCapture {
     }
 
     // -----------------------------------------------------------------------
-    // Public API — student-facing (no cursor)
+    // Public API — student streaming (zero-copy JPEG passthrough)
+    //
+    //   GUARD: studentPipeUp checked first.
+    //   If FFmpeg is running: return raw JPEG bytes directly, NO processing.
+    //   No ImageIO.read, no ImageIO.write, no decode, no re-encode.
     // -----------------------------------------------------------------------
 
-    public static String captureAsBase64(double resolutionScale, float jpegQuality) {
-        try {
-            byte[] jpeg = latestStudentJpeg.get();
-            if (jpeg == null) return null;
-            BufferedImage img = ImageIO.read(new ByteArrayInputStream(jpeg));
-            if (img == null) return null;
-            return encodeScaled(img, resolutionScale, jpegQuality);
-        } catch (Exception e) { return null; }
-    }
+    /**
+     * Returns the latest JPEG frame as Base64 for the LEGACY_CPU text stream.
+     * Zero-copy: raw bytes from FFmpeg → Base64. No decode/re-encode.
+     * Returns null if no new frame has arrived (frame-drop semantics).
+     */
+    public static String captureForStreaming() {
+        if (!studentPipeUp.get()) return null; // pipe not running — no fallback
 
-    public static byte[] captureAsBytes(double resolutionScale, float jpegQuality) {
-        try {
-            byte[] jpeg = latestStudentJpeg.get();
-            if (jpeg == null) return null;
-            BufferedImage img = ImageIO.read(new ByteArrayInputStream(jpeg));
-            if (img == null) return null;
-            return encodeScaledBytes(img, resolutionScale, jpegQuality);
-        } catch (Exception e) { return null; }
+        byte[] jpeg = latestStudentJpeg.getAndSet(null); // consume latest
+        if (jpeg == null) return null; // no new frame since last poll
+        return Base64.getEncoder().encodeToString(jpeg); // zero-copy passthrough
     }
 
     /**
-     * Streaming capture — zero-copy JPEG passthrough.
-     *
-     * FFmpeg gdigrab already outputs a clean, cursor-free JPEG at 30 FPS.
-     * We send those bytes directly as Base64 without any decode, scale, or
-     * re-encode step.  This eliminates:
-     *   (a) the shared reusableBuffer race between the producer and consumer
-     *   (b) the 15-25 ms decode+re-encode cost that caused frame-timing drift
-     *   (c) the per-frame BufferedImage allocation of the old delta detector
-     *
-     * Frame-rate control is handled natively by FFmpeg's -framerate flag;
-     * the AtomicReference getAndSet(null) guarantees only the latest frame
-     * is ever transmitted (natural frame-drop if network is slower than 30 FPS).
+     * Returns raw JPEG bytes for the binary/ultra stream.
+     * Zero-copy: raw FFmpeg output, no decode/re-encode.
+     * Returns null if no new frame has arrived.
      */
-    public static String captureForStreaming() {
-        byte[] jpeg = latestStudentJpeg.getAndSet(null); // consume latest frame
-        if (jpeg == null) return null; // no new frame since last poll — skip
-        return Base64.getEncoder().encodeToString(jpeg); // zero-copy passthrough
+    public static byte[] captureAsBytes() {
+        if (!studentPipeUp.get()) return null;
+        return latestStudentJpeg.getAndSet(null);
     }
 
     // -----------------------------------------------------------------------
@@ -298,14 +242,20 @@ public class ScreenCapture {
     public static void startAsyncCapture() {
         if (asyncRunning) return;
         asyncRunning = true;
-        if (ffmpegAvailable) startAdminPipe();
+        startAdminPipe();
 
         Thread t = new Thread(() -> {
             while (asyncRunning) {
                 try {
-                    String frame = captureAsBase64WithCursor(1.0, 0.8f);
-                    if (frame != null) latestAdminFrame.set(frame);
-                    Thread.sleep(16);
+                    // Guard: only use admin FFmpeg pipe — no Robot fallback
+                    if (adminPipeUp.get()) {
+                        byte[] jpeg = latestAdminJpeg.get();
+                        if (jpeg != null) {
+                            // Zero-copy: raw JPEG → Base64. No ImageIO decode/re-encode.
+                            latestAdminFrame.set(Base64.getEncoder().encodeToString(jpeg));
+                        }
+                    }
+                    Thread.sleep(16); // ~60 Hz poll
                 } catch (InterruptedException e) { break; }
                 catch (Exception ignored) {}
             }
@@ -318,116 +268,16 @@ public class ScreenCapture {
     public static void stopAsyncCapture() {
         asyncRunning = false;
         latestAdminFrame.set(null);
-        if (ffmpegAvailable) stopAdminPipe();
+        stopAdminPipe();
     }
 
     public static String getLatestFrame() { return latestAdminFrame.get(); }
 
-    /** Admin screen-share frame WITH cursor — uses admin FFmpeg pipe (draw_mouse=1). */
-    public static String captureAsBase64WithCursor(double scale, float quality) {
-        try {
-            if (ffmpegAvailable) {
-                byte[] jpeg = latestAdminJpeg.get();
-                if (jpeg == null) return null;
-                BufferedImage img = ImageIO.read(new ByteArrayInputStream(jpeg));
-                if (img == null) return null;
-                return encodeScaled(img, scale, quality);
-            }
-            // Fallback (ffmpeg absent): AWT Robot + manual cursor draw
-            if (fallbackRobot == null) return null;
-            BufferedImage capture = fallbackRobot.createScreenCapture(
-                    new Rectangle(Toolkit.getDefaultToolkit().getScreenSize()));
-            int w = (int)(capture.getWidth() * scale);
-            int h = (int)(capture.getHeight() * scale);
-            ensureBuffer(w, h);
-            reusableGraphics.drawImage(capture, 0, 0, w, h, null);
-            drawMouseCursor(reusableGraphics, scale, scale);
-            return encodeJpeg(reusableBuffer, quality);
-        } catch (Exception e) { return null; }
-    }
-
     // -----------------------------------------------------------------------
-    // Convenience overloads
+    // Utility — Base64 decode for displaying received frames
     // -----------------------------------------------------------------------
-    public static String captureAsBase64(double scale) { return captureAsBase64(scale, 0.85f); }
-    public static String captureHighQuality()           { return captureAsBase64(1.0, 0.95f); }
-
-    // -----------------------------------------------------------------------
-    // Encode helpers
-    // -----------------------------------------------------------------------
-    private static String encodeScaled(BufferedImage img, double scale, float quality) throws Exception {
-        return Base64.getEncoder().encodeToString(encodeScaledBytes(img, scale, quality));
-    }
-
-    /**
-     * Synchronized on ScreenCapture.class — the shared reusableBuffer / reusableGraphics
-     * fields are written here (admin screen-share path).  Without this lock, concurrent
-     * calls from the async admin-capture thread could produce torn frames.
-     */
-    private static synchronized byte[] encodeScaledBytes(BufferedImage img, double scale, float quality) throws Exception {
-        int w = (int)(img.getWidth() * scale);
-        int h = (int)(img.getHeight() * scale);
-        ensureBuffer(w, h);
-        reusableGraphics.drawImage(img, 0, 0, w, h, null);
-        return encodeJpegBytes(reusableBuffer, quality);
-    }
-
-    private static void ensureBuffer(int w, int h) {
-        // Called only from synchronized encodeScaledBytes — no additional lock needed
-        if (reusableBuffer == null || reusableBuffer.getWidth() != w || reusableBuffer.getHeight() != h) {
-            if (reusableGraphics != null) reusableGraphics.dispose();
-            reusableBuffer   = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
-            reusableGraphics = reusableBuffer.createGraphics();
-            reusableGraphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            reusableGraphics.setRenderingHint(RenderingHints.KEY_RENDERING,     RenderingHints.VALUE_RENDER_SPEED);
-        }
-    }
-
-    private static String encodeJpeg(BufferedImage img, float quality) throws Exception {
-        return Base64.getEncoder().encodeToString(encodeJpegBytes(img, quality));
-    }
-
-    private static byte[] encodeJpegBytes(BufferedImage img, float quality) throws Exception {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream(80_000);
-        Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpg");
-        if (writers.hasNext()) {
-            ImageWriter writer = writers.next();
-            ImageWriteParam param = writer.getDefaultWriteParam();
-            param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-            param.setCompressionQuality(quality);
-            ImageOutputStream ios = ImageIO.createImageOutputStream(baos);
-            writer.setOutput(ios);
-            writer.write(null, new IIOImage(img, null, null), param);
-            writer.dispose();
-            ios.close();
-        } else {
-            ImageIO.write(img, "jpg", baos);
-        }
-        return baos.toByteArray();
-    }
-
-    // isDeltaSmall() removed — FFmpeg -framerate handles stale-frame suppression
-    // natively at the OS level. The per-frame BufferedImage allocation it caused
-    // (new BufferedImage each call) was itself a source of timing drift and GC pressure.
-
-    // -----------------------------------------------------------------------
-    // Cursor drawing (fallback only — not used when FFmpeg is available)
-    // -----------------------------------------------------------------------
-    private static void drawMouseCursor(Graphics2D g, double sx, double sy) {
-        try {
-            Point p = MouseInfo.getPointerInfo().getLocation();
-            int mx = (int)(p.x * sx), my = (int)(p.y * sy);
-            for (int row = 0; row < CURSOR_SHAPE.length; row++)
-                for (int col = 0; col < CURSOR_SHAPE[row].length; col++) {
-                    int v = CURSOR_SHAPE[row][col];
-                    if      (v == 1) { g.setColor(Color.BLACK); g.fillRect(mx+col, my+row, 1, 1); }
-                    else if (v == 2) { g.setColor(Color.WHITE); g.fillRect(mx+col, my+row, 1, 1); }
-                }
-        } catch (Exception ignored) {}
-    }
-
     public static BufferedImage decodeBase64(String b64) {
-        try { return ImageIO.read(new ByteArrayInputStream(Base64.getDecoder().decode(b64))); }
+        try { return ImageIO.read(new java.io.ByteArrayInputStream(Base64.getDecoder().decode(b64))); }
         catch (Exception e) { return null; }
     }
 }

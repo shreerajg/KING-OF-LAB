@@ -308,7 +308,9 @@ public class KingClient {
                 AuditLogger.logError("UltraStream", e.getMessage());
                 currentMode = StreamMode.LEGACY_CPU;
                 stopUltraBinaryStream();
-                startScreenCapture(); // graceful fallback to AWT Robot
+                // Do NOT start any other capture pipeline — ScreenCapture FFmpeg pipe
+                // is already running independently.  Switching mode back to LEGACY_CPU
+                // means captureAndSend() will use ScreenCapture.captureForStreaming().
             } finally {
                 stopUltraBinaryStream();
             }
