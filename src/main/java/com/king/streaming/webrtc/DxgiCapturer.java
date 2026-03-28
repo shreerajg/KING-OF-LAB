@@ -9,30 +9,6 @@ import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * King of Lab — FFmpeg MJPEG Pipe Capturer (Flicker-Free, Zero-Copy).
- *
- * SINGLE CAPTURE PIPELINE:
- *   ffmpeg -f gdigrab -framerate 30 -draw_mouse 0 -i desktop -f mjpeg -q:v 4 pipe:1
- *
- * Design:
- *   - FFmpeg writes MJPEG frames to stdout.
- *   - A background reader thread parses JPEG boundaries (FF D8 / FF D9)
- *     and stores the latest complete frame in an AtomicReference<byte[]>.
- *   - getNextFrame() reads AND clears the reference (frame-drop semantics):
- *     only the LATEST frame is ever transmitted; stale frames are dropped.
- *
- * Cursor: -draw_mouse 0 excludes the cursor at the OS level BEFORE the GPU
- * writes the frame.  No hide/show of the hardware cursor ever occurs.
- *
- * What was REMOVED vs the previous implementation:
- *   ✗ BitBlt / GetDC / GetDesktopWindow (GDI — root cause of cursor flicker)
- *   ✗ SRCCOPY / CAPTUREBLT flags
- *   ✗ AWT Robot.createScreenCapture()
- *   ✗ ImageIO.read / ImageIO.write decode→re-encode pipeline
- *   ✗ Shared reusableBuffer / reusableGraphics (race condition source)
- *   ✗ DXGI stub that silently fell through to GDI
- */
 public class DxgiCapturer implements ScreenCapturer {
 
     // -----------------------------------------------------------------------
@@ -48,7 +24,7 @@ public class DxgiCapturer implements ScreenCapturer {
     private final AtomicReference<byte[]> latestFrame = new AtomicReference<>(null);
 
     private volatile Process ffmpegProc;
-    private volatile Thread  readerThread;
+    private volatile Thread readerThread;
 
     // -----------------------------------------------------------------------
     // ScreenCapturer interface
@@ -56,20 +32,20 @@ public class DxgiCapturer implements ScreenCapturer {
 
     @Override
     public void startCapture() {
-        if (isCapturing.getAndSet(true)) return; // already running
+        if (isCapturing.getAndSet(true))
+            return; // already running
 
         try {
             ProcessBuilder pb = new ProcessBuilder(
-                "ffmpeg",
-                "-loglevel",   "quiet",
-                "-f",          "gdigrab",
-                "-framerate",  "30",
-                "-draw_mouse", "0",   // exclude cursor at OS level — NO flicker
-                "-i",          "desktop",
-                "-f",          "mjpeg",
-                "-q:v",        "4",
-                "pipe:1"
-            );
+                    "ffmpeg",
+                    "-loglevel", "quiet",
+                    "-f", "gdigrab",
+                    "-framerate", "30",
+                    "-draw_mouse", "0", // exclude cursor at OS level — NO flicker
+                    "-i", "desktop",
+                    "-f", "mjpeg",
+                    "-q:v", "4",
+                    "pipe:1");
             ffmpegProc = pb.start();
             drainStderr(ffmpegProc);
 
@@ -124,8 +100,7 @@ public class DxgiCapturer implements ScreenCapturer {
     // -----------------------------------------------------------------------
 
     private void readMjpeg() {
-        try (BufferedInputStream bis =
-                 new BufferedInputStream(ffmpegProc.getInputStream(), 512_000)) {
+        try (BufferedInputStream bis = new BufferedInputStream(ffmpegProc.getInputStream(), 512_000)) {
 
             ByteArrayOutputStream frame = new ByteArrayOutputStream(250_000);
             int prev = -1;
@@ -133,7 +108,8 @@ public class DxgiCapturer implements ScreenCapturer {
 
             while (isCapturing.get() && !Thread.currentThread().isInterrupted()) {
                 int b = bis.read();
-                if (b < 0) break; // FFmpeg closed stdout
+                if (b < 0)
+                    break; // FFmpeg closed stdout
 
                 if (!inFrame) {
                     // Wait for JPEG SOI marker: FF D8
@@ -173,8 +149,10 @@ public class DxgiCapturer implements ScreenCapturer {
 
     private static void drainStderr(Process p) {
         Thread t = new Thread(() -> {
-            try { p.getErrorStream().transferTo(OutputStream.nullOutputStream()); }
-            catch (Exception ignored) {}
+            try {
+                p.getErrorStream().transferTo(OutputStream.nullOutputStream());
+            } catch (Exception ignored) {
+            }
         }, "DxgiCapturer-FFmpeg-Stderr");
         t.setDaemon(true);
         t.start();
