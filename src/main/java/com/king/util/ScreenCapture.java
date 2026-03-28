@@ -66,8 +66,6 @@ public class ScreenCapture {
 
     private static BufferedImage reusableBuffer;
     private static Graphics2D    reusableGraphics;
-    private static BufferedImage prevFrame;
-    private static final double  DELTA_THRESHOLD = 0.015;
 
     // Async screen-share state
     private static final AtomicReference<String> latestAdminFrame =
@@ -274,24 +272,23 @@ public class ScreenCapture {
     }
 
     /**
-     * Streaming capture with delta detection.
-     * Returns null when frame is nearly identical to previous (bandwidth save).
+     * Streaming capture — zero-copy JPEG passthrough.
+     *
+     * FFmpeg gdigrab already outputs a clean, cursor-free JPEG at 30 FPS.
+     * We send those bytes directly as Base64 without any decode, scale, or
+     * re-encode step.  This eliminates:
+     *   (a) the shared reusableBuffer race between the producer and consumer
+     *   (b) the 15-25 ms decode+re-encode cost that caused frame-timing drift
+     *   (c) the per-frame BufferedImage allocation of the old delta detector
+     *
+     * Frame-rate control is handled natively by FFmpeg's -framerate flag;
+     * the AtomicReference getAndSet(null) guarantees only the latest frame
+     * is ever transmitted (natural frame-drop if network is slower than 30 FPS).
      */
     public static String captureForStreaming() {
-        try {
-            byte[] jpeg = latestStudentJpeg.getAndSet(null); // consume frame
-            if (jpeg == null) return null;
-            BufferedImage img = ImageIO.read(new ByteArrayInputStream(jpeg));
-            if (img == null) return null;
-
-            if (prevFrame != null && isDeltaSmall(prevFrame, img)) return null;
-
-            int qW = img.getWidth() / 4, qH = img.getHeight() / 4;
-            prevFrame = new BufferedImage(qW, qH, BufferedImage.TYPE_INT_RGB);
-            prevFrame.createGraphics().drawImage(img, 0, 0, qW, qH, null);
-
-            return encodeScaled(img, 1.0, 0.72f);
-        } catch (Exception e) { return null; }
+        byte[] jpeg = latestStudentJpeg.getAndSet(null); // consume latest frame
+        if (jpeg == null) return null; // no new frame since last poll — skip
+        return Base64.getEncoder().encodeToString(jpeg); // zero-copy passthrough
     }
 
     // -----------------------------------------------------------------------
@@ -362,7 +359,12 @@ public class ScreenCapture {
         return Base64.getEncoder().encodeToString(encodeScaledBytes(img, scale, quality));
     }
 
-    private static byte[] encodeScaledBytes(BufferedImage img, double scale, float quality) throws Exception {
+    /**
+     * Synchronized on ScreenCapture.class — the shared reusableBuffer / reusableGraphics
+     * fields are written here (admin screen-share path).  Without this lock, concurrent
+     * calls from the async admin-capture thread could produce torn frames.
+     */
+    private static synchronized byte[] encodeScaledBytes(BufferedImage img, double scale, float quality) throws Exception {
         int w = (int)(img.getWidth() * scale);
         int h = (int)(img.getHeight() * scale);
         ensureBuffer(w, h);
@@ -371,6 +373,7 @@ public class ScreenCapture {
     }
 
     private static void ensureBuffer(int w, int h) {
+        // Called only from synchronized encodeScaledBytes — no additional lock needed
         if (reusableBuffer == null || reusableBuffer.getWidth() != w || reusableBuffer.getHeight() != h) {
             if (reusableGraphics != null) reusableGraphics.dispose();
             reusableBuffer   = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
@@ -403,19 +406,9 @@ public class ScreenCapture {
         return baos.toByteArray();
     }
 
-    // -----------------------------------------------------------------------
-    // Delta detection
-    // -----------------------------------------------------------------------
-    private static boolean isDeltaSmall(BufferedImage prev, BufferedImage cur) {
-        int qW = prev.getWidth(), qH = prev.getHeight();
-        BufferedImage q = new BufferedImage(qW, qH, BufferedImage.TYPE_INT_RGB);
-        q.createGraphics().drawImage(cur, 0, 0, qW, qH, null);
-        int total = qW * qH, changed = 0, thresh = (int)(total * DELTA_THRESHOLD);
-        for (int y = 0; y < qH; y++)
-            for (int x = 0; x < qW; x++)
-                if (prev.getRGB(x, y) != q.getRGB(x, y) && ++changed > thresh) return false;
-        return true;
-    }
+    // isDeltaSmall() removed — FFmpeg -framerate handles stale-frame suppression
+    // natively at the OS level. The per-frame BufferedImage allocation it caused
+    // (new BufferedImage each call) was itself a source of timing drift and GC pressure.
 
     // -----------------------------------------------------------------------
     // Cursor drawing (fallback only — not used when FFmpeg is available)

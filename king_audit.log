@@ -413,3 +413,16 @@
 [2026-03-27 00:45:13] [SYSTEM] Connected to admin at 127.0.0.1
 [2026-03-27 00:45:13] [CONNECT] Student connected: shree (Roll:73 SYA)
 [2026-03-27 00:46:21] [DISCONNECT] Student disconnected: shree
+[2026-03-28 23:38:05] [SYSTEM] King of Lab v3.0 started
+[2026-03-28 23:38:05] [SYSTEM] Database initialised
+[2026-03-28 23:38:11] [LOGIN] admin logged in successfully
+[2026-03-28 23:38:11] [SYSTEM] King of Lab Admin started
+[2026-03-28 23:38:11] [SYSTEM] King Server listening on port 5555
+[2026-03-28 23:38:11] [SYSTEM] Ultra-Binary Stream Server listening on port 5556
+[2026-03-28 23:38:28] [SYSTEM] King of Lab v3.0 started
+[2026-03-28 23:38:28] [SYSTEM] Database initialised
+[2026-03-28 23:38:34] [LOGIN] shree logged in successfully
+[2026-03-28 23:38:35] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-28 23:38:35] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-28 23:38:35] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-28 23:39:15] [COMMAND] admin → ALL: RESTART
