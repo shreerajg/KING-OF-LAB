@@ -67,6 +67,7 @@ public class ScreenCapture {
     // Static init — start student pipe immediately
     // -----------------------------------------------------------------------
     static {
+        FfmpegResolver.logResolved();
         startStudentPipe();
     }
 
@@ -101,7 +102,7 @@ public class ScreenCapture {
              *          -f mjpeg -q:v 4 pipe:1
              */
             ProcessBuilder pb = new ProcessBuilder(
-                "ffmpeg",
+                FfmpegResolver.get(),
                 "-loglevel", "quiet",
                 "-f",        "lavfi",
                 "-i",        "ddagrab=output_idx=0:framerate=30:draw_mouse=0",
@@ -147,7 +148,7 @@ public class ScreenCapture {
              * to GDI cursor hooks.  This is the best we can do without ddagrab.
              */
             ProcessBuilder pb = new ProcessBuilder(
-                "ffmpeg",
+                FfmpegResolver.get(),
                 "-loglevel",   "quiet",
                 "-f",          "gdigrab",
                 "-framerate",  "30",
@@ -193,7 +194,7 @@ public class ScreenCapture {
     private static boolean tryStartAdminDdagrab() {
         try {
             ProcessBuilder pb = new ProcessBuilder(
-                "ffmpeg",
+                FfmpegResolver.get(),
                 "-loglevel", "quiet",
                 "-f",        "lavfi",
                 "-i",        "ddagrab=output_idx=0:framerate=30:draw_mouse=1",
@@ -230,7 +231,7 @@ public class ScreenCapture {
     private static void tryStartAdminGdigrab() {
         try {
             ProcessBuilder pb = new ProcessBuilder(
-                "ffmpeg",
+                FfmpegResolver.get(),
                 "-loglevel",   "quiet",
                 "-f",          "gdigrab",
                 "-framerate",  "30",

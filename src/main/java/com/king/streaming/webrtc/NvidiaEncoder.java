@@ -2,6 +2,7 @@ package com.king.streaming.webrtc;
 
 import com.king.streaming.api.VideoEncoder;
 import com.king.util.AuditLogger;
+import com.king.util.FfmpegResolver;
 
 /**
  * King of Lab — NVIDIA NVENC Hardware Encoder.
@@ -57,7 +58,7 @@ public class NvidiaEncoder implements VideoEncoder {
     private static boolean probeNvenc() {
         try {
             Process p = Runtime.getRuntime().exec(
-                    new String[]{"ffmpeg", "-encoders", "-hide_banner"});
+                    new String[]{FfmpegResolver.get(), "-encoders", "-hide_banner"});
             byte[] out = p.getInputStream().readAllBytes();
             p.waitFor();
             return new String(out).contains("h264_nvenc");

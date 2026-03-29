@@ -2,6 +2,7 @@ package com.king.streaming.webrtc;
 
 import com.king.streaming.api.VideoEncoder;
 import com.king.util.AuditLogger;
+import com.king.util.FfmpegResolver;
 
 import java.io.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -154,8 +155,8 @@ public class H264SoftwareEncoder implements VideoEncoder {
      */
     private boolean tryStartFfmpeg() {
         try {
-            // Detect FFmpeg on PATH
-            Process probe = Runtime.getRuntime().exec(new String[]{"ffmpeg", "-version"});
+            // Detect FFmpeg (bundled or system PATH)
+            Process probe = Runtime.getRuntime().exec(new String[]{FfmpegResolver.get(), "-version"});
             probe.waitFor();
             if (probe.exitValue() != 0) return false;
 
@@ -164,7 +165,7 @@ public class H264SoftwareEncoder implements VideoEncoder {
             String bitrateK = (bitrateBps / 1000) + "k";
 
             ProcessBuilder pb = new ProcessBuilder(
-                "ffmpeg",
+                FfmpegResolver.get(),
                 "-loglevel", "quiet",
                 "-f",  "mjpeg", "-i", "pipe:0",
                 "-vf", "scale=" + width + ":" + height,
@@ -213,7 +214,7 @@ public class H264SoftwareEncoder implements VideoEncoder {
     private String detectBestCodec() {
         try {
             Process p = Runtime.getRuntime().exec(
-                new String[]{"ffmpeg", "-encoders", "-hide_banner"});
+                new String[]{FfmpegResolver.get(), "-encoders", "-hide_banner"});
             byte[] out = p.getInputStream().readAllBytes();
             p.waitFor();
             String encoders = new String(out);

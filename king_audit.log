@@ -451,3 +451,19 @@
 [2026-03-29 19:53:05] [SYSTEM] Connected to admin at 127.0.0.1
 [2026-03-29 19:53:06] [CONNECT] Student connected: shree (Roll:73 SYA)
 [2026-03-29 19:54:25] [DISCONNECT] Student disconnected: shree
+[2026-03-29 19:59:59] [SYSTEM] King of Lab v3.0 started
+[2026-03-29 19:59:59] [SYSTEM] Database initialised
+[2026-03-29 20:00:04] [LOGIN] admin logged in successfully
+[2026-03-29 20:00:04] [SYSTEM] King of Lab Admin started
+[2026-03-29 20:00:04] [SYSTEM] King Server listening on port 5555
+[2026-03-29 20:00:04] [SYSTEM] Ultra-Binary Stream Server listening on port 5556
+[2026-03-29 20:00:15] [SYSTEM] King of Lab v3.0 started
+[2026-03-29 20:00:15] [SYSTEM] Database initialised
+[2026-03-29 20:00:19] [LOGIN] shree logged in successfully
+[2026-03-29 20:00:20] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-29 20:00:20] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-29 20:00:20] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-29 20:01:43] [SYSTEM] Switching Stream Mode to: ULTRA_WEBRTC
+[2026-03-29 20:01:43] [SYSTEM] Stream Mode switched to ULTRA_WEBRTC
+[2026-03-29 20:15:49] [DISCONNECT] Student disconnected: shree
+[2026-03-29 20:15:49] [ERROR] [BinaryStream] Connection reset
