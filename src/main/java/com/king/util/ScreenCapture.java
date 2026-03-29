@@ -114,7 +114,7 @@ public class ScreenCapture {
                 "-loglevel",   "quiet",
                 "-f",          "gdigrab",
                 "-framerate",  "60",
-                "-draw_mouse", "1",   // include cursor so students see admin pointer
+                "-draw_mouse", "0",   // exclude cursor to prevent flicker
                 "-i",          "desktop",
                 "-f",          "mjpeg",
                 "-q:v",        "3",
