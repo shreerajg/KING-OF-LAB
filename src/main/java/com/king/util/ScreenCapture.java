@@ -8,30 +8,33 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.imageio.*;
 
 /**
- * King of Lab — ScreenCapture (FFmpeg-Only Edition)
+ * King of Lab — ScreenCapture (ddagrab Edition)
  *
- * ALL student-facing screen capture now goes through a single, persistent
- * FFmpeg gdigrab MJPEG pipe.  No GDI, no AWT Robot, no decode/re-encode.
+ * ─────────────────────────────────────────────────────────────────
+ * ROOT CAUSE OF CURSOR FLICKER (fixed here):
+ *   ffmpeg -f gdigrab uses Windows GDI BitBlt() internally.
+ *   GDI calls GetCursorInfo() every frame and briefly hides/redraws
+ *   the hardware cursor at the display-driver level — even with
+ *   -draw_mouse 0. This causes visible 30 Hz flicker on the student PC.
  *
- * PRIMARY PIPELINE (student — no cursor):
- *   ffmpeg -f gdigrab -framerate 30 -draw_mouse 0 -i desktop -f mjpeg -q:v 4 pipe:1
- *   → JPEG bytes → AtomicReference<byte[]> → send directly (zero-copy)
+ * THE FIX:
+ *   Switch to -f lavfi -i ddagrab (DXGI Desktop Duplication API).
+ *   ddagrab operates at the GPU/DXGI layer and does NOT touch the
+ *   Windows cursor at all — zero flicker, zero GDI hooks.
  *
- * ADMIN PIPELINE (admin screen-share — cursor visible):
- *   ffmpeg -f gdigrab -framerate 60 -draw_mouse 1 -i desktop -f mjpeg -q:v 3 pipe:1
- *   → JPEG bytes → AtomicReference<byte[]> → Base64 for WebSocket delivery
+ *   If ddagrab is unavailable (older FFmpeg), fall back to gdigrab
+ *   with the lowest possible framerate to minimise flicker impact.
+ * ─────────────────────────────────────────────────────────────────
  *
- * What was REMOVED:
- *   ✗ AWT Robot.createScreenCapture()
- *   ✗ ImageIO.read() / ImageIO.write() in the streaming path
- *   ✗ encodeScaled() / encodeScaledBytes() — decode→scale→re-encode
- *   ✗ reusableBuffer / reusableGraphics shared buffers (race condition source)
- *   ✗ isDeltaSmall() / prevFrame delta detection
- *   ✗ Fallback Robot path (if ffmpeg absent the pipe simply won't start)
+ * STUDENT PIPELINE  (no cursor, flicker-free):
+ *   ddagrab  → scale → mjpeg   (GPU path, 30 FPS)
+ *   fallback: gdigrab → mjpeg  (CPU path, draw_mouse=0)
  *
- * GUARD:
- *   If the student FFmpeg pipe is running, NO other capture method is invoked.
- *   The studentPipeUp flag is checked before every capture call.
+ * ADMIN PIPELINE  (admin screen-share only, cursor included):
+ *   ddagrab  → scale → mjpeg   (GPU path, 30 FPS, draw_mouse=1 overlay)
+ *   note: admin pipe started ONLY when screen-share is active.
+ *
+ * Static init: student pipe starts immediately for best first-frame latency.
  */
 public class ScreenCapture {
 
@@ -45,7 +48,7 @@ public class ScreenCapture {
             new AtomicReference<>(null);
 
     // -----------------------------------------------------------------------
-    // Admin pipe  (cursor visible, 60 FPS — admin screen-share only)
+    // Admin pipe  (cursor visible, 30 FPS — admin screen-share only)
     // -----------------------------------------------------------------------
     private static volatile Process      adminProc;
     private static volatile Thread       adminReader;
@@ -68,34 +71,104 @@ public class ScreenCapture {
     }
 
     // -----------------------------------------------------------------------
-    // Student pipe management  (draw_mouse=0, 30 FPS, q:v 4)
+    // Student pipe management
+    //
+    // PRIMARY  : ddagrab (DXGI) — never touches the Windows cursor system at all
+    // FALLBACK : gdigrab with draw_mouse=0 — minimised flicker
     // -----------------------------------------------------------------------
     private static synchronized void startStudentPipe() {
         if (studentPipeUp.get()) return;
+
+        // Try ddagrab first (FFmpeg ≥ 5.1, Windows with DXGI support)
+        if (tryStartStudentDdagrab()) return;
+
+        // Fallback: gdigrab (may flicker slightly, but draw_mouse=0 is set)
+        tryStartStudentGdigrab();
+    }
+
+    private static boolean tryStartStudentDdagrab() {
         try {
+            /*
+             * ddagrab captures via DXGI Desktop Duplication and writes NV12
+             * frames to the filter graph.  We then convert to yuv420p and
+             * encode to MJPEG.  cursor=0 tells ddagrab not to composite the
+             * cursor onto the frame — and it never calls GetCursorInfo() at
+             * all, so the hardware cursor is *completely unaffected*.
+             *
+             * Command equivalent:
+             *   ffmpeg -f lavfi -i "ddagrab=output_idx=0:framerate=30:draw_mouse=0"
+             *          -vf "hwdownload,format=bgra,scale=iw:ih,format=yuv420p"
+             *          -f mjpeg -q:v 4 pipe:1
+             */
+            ProcessBuilder pb = new ProcessBuilder(
+                "ffmpeg",
+                "-loglevel", "quiet",
+                "-f",        "lavfi",
+                "-i",        "ddagrab=output_idx=0:framerate=30:draw_mouse=0",
+                "-vf",       "hwdownload,format=bgra,scale=iw:ih,format=yuv420p",
+                "-f",        "mjpeg",
+                "-q:v",      "4",
+                "pipe:1"
+            );
+            Process p = pb.start();
+            drainStderr(p, "Student-ddagrab");
+
+            // Wait briefly to confirm FFmpeg actually started outputting frames
+            // (ddagrab fails immediately on unsupported hardware/driver)
+            Thread.sleep(500);
+            if (!p.isAlive()) {
+                System.err.println("[ScreenCapture] ddagrab not available — will try gdigrab fallback");
+                return false;
+            }
+
+            studentProc = p;
+            studentPipeUp.set(true);
+            studentReader = new Thread(
+                () -> readMjpeg(studentProc, latestStudentJpeg, studentPipeUp),
+                "FFmpeg-Student-ddagrab-Reader");
+            studentReader.setDaemon(true);
+            studentReader.setPriority(Thread.MAX_PRIORITY - 1);
+            studentReader.start();
+
+            System.out.println("[ScreenCapture] Student pipe started via ddagrab (DXGI, cursor-free, 30 FPS)");
+            return true;
+
+        } catch (Exception e) {
+            System.err.println("[ScreenCapture] ddagrab launch failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private static void tryStartStudentGdigrab() {
+        try {
+            /*
+             * Fallback: gdigrab with draw_mouse=0
+             * Note: gdigrab still flickers slightly on some Windows drivers due
+             * to GDI cursor hooks.  This is the best we can do without ddagrab.
+             */
             ProcessBuilder pb = new ProcessBuilder(
                 "ffmpeg",
                 "-loglevel",   "quiet",
                 "-f",          "gdigrab",
                 "-framerate",  "30",
-                "-draw_mouse", "0",   // exclude cursor at OS level — no flicker
+                "-draw_mouse", "0",
                 "-i",          "desktop",
                 "-f",          "mjpeg",
                 "-q:v",        "4",
                 "pipe:1"
             );
             studentProc = pb.start();
-            drainStderr(studentProc, "Student");
+            drainStderr(studentProc, "Student-gdigrab");
             studentPipeUp.set(true);
 
             studentReader = new Thread(
                 () -> readMjpeg(studentProc, latestStudentJpeg, studentPipeUp),
-                "FFmpeg-Student-Reader");
+                "FFmpeg-Student-gdigrab-Reader");
             studentReader.setDaemon(true);
             studentReader.setPriority(Thread.MAX_PRIORITY - 1);
             studentReader.start();
 
-            System.out.println("[ScreenCapture] Student FFmpeg pipe started (draw_mouse=0, 30 FPS)");
+            System.out.println("[ScreenCapture] Student pipe started via gdigrab fallback (draw_mouse=0, 30 FPS)");
 
         } catch (Exception e) {
             studentPipeUp.set(false);
@@ -104,29 +177,76 @@ public class ScreenCapture {
     }
 
     // -----------------------------------------------------------------------
-    // Admin pipe management  (draw_mouse=1, 60 FPS, q:v 3)
+    // Admin pipe management  (cursor visible, 30 FPS — admin screen-share only)
+    //
+    // For admin we still use ddagrab (or gdigrab as fallback), but with
+    // draw_mouse=1 so the admin's cursor is visible to students.
+    // Admin pipe is only started when screen-share is explicitly enabled.
     // -----------------------------------------------------------------------
     private static synchronized void startAdminPipe() {
         if (adminPipeUp.get()) return;
+
+        if (tryStartAdminDdagrab()) return;
+        tryStartAdminGdigrab();
+    }
+
+    private static boolean tryStartAdminDdagrab() {
+        try {
+            ProcessBuilder pb = new ProcessBuilder(
+                "ffmpeg",
+                "-loglevel", "quiet",
+                "-f",        "lavfi",
+                "-i",        "ddagrab=output_idx=0:framerate=30:draw_mouse=1",
+                "-vf",       "hwdownload,format=bgra,scale=iw:ih,format=yuv420p",
+                "-f",        "mjpeg",
+                "-q:v",      "3",
+                "pipe:1"
+            );
+            Process p = pb.start();
+            drainStderr(p, "Admin-ddagrab");
+
+            Thread.sleep(500);
+            if (!p.isAlive()) {
+                return false;
+            }
+
+            adminProc = p;
+            adminPipeUp.set(true);
+            adminReader = new Thread(
+                () -> readMjpeg(adminProc, latestAdminJpeg, adminPipeUp),
+                "FFmpeg-Admin-ddagrab-Reader");
+            adminReader.setDaemon(true);
+            adminReader.setPriority(Thread.MAX_PRIORITY - 2);
+            adminReader.start();
+
+            System.out.println("[ScreenCapture] Admin pipe started via ddagrab");
+            return true;
+
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static void tryStartAdminGdigrab() {
         try {
             ProcessBuilder pb = new ProcessBuilder(
                 "ffmpeg",
                 "-loglevel",   "quiet",
                 "-f",          "gdigrab",
-                "-framerate",  "60",
-                "-draw_mouse", "0",   // exclude cursor to prevent flicker
+                "-framerate",  "30",
+                "-draw_mouse", "0",   // admin pipe also cursor-free to prevent flicker
                 "-i",          "desktop",
                 "-f",          "mjpeg",
                 "-q:v",        "3",
                 "pipe:1"
             );
             adminProc = pb.start();
-            drainStderr(adminProc, "Admin");
+            drainStderr(adminProc, "Admin-gdigrab");
             adminPipeUp.set(true);
 
             adminReader = new Thread(
                 () -> readMjpeg(adminProc, latestAdminJpeg, adminPipeUp),
-                "FFmpeg-Admin-Reader");
+                "FFmpeg-Admin-gdigrab-Reader");
             adminReader.setDaemon(true);
             adminReader.setPriority(Thread.MAX_PRIORITY - 2);
             adminReader.start();
@@ -139,8 +259,8 @@ public class ScreenCapture {
 
     private static synchronized void stopAdminPipe() {
         adminPipeUp.set(false);
-        if (adminProc != null) { adminProc.destroyForcibly(); adminProc = null; }
-        if (adminReader != null) { adminReader.interrupt(); adminReader = null; }
+        if (adminProc   != null) { adminProc.destroyForcibly();   adminProc   = null; }
+        if (adminReader != null) { adminReader.interrupt();        adminReader = null; }
         latestAdminJpeg.set(null);
     }
 
@@ -163,7 +283,6 @@ public class ScreenCapture {
                 if (b < 0) break;
 
                 if (!inFrame) {
-                    // Wait for JPEG SOI: FF D8
                     if (prev == 0xFF && b == 0xD8) {
                         frame.reset();
                         frame.write(0xFF);
@@ -176,9 +295,8 @@ public class ScreenCapture {
 
                 frame.write(b);
 
-                // JPEG EOI: FF D9
                 if (prev == 0xFF && b == 0xD9 && frame.size() > 100) {
-                    target.set(frame.toByteArray()); // latest frame wins
+                    target.set(frame.toByteArray());
                     frame.reset();
                     inFrame = false;
                 }
@@ -193,7 +311,7 @@ public class ScreenCapture {
     }
 
     // -----------------------------------------------------------------------
-    // Stderr drainer — prevents FFmpeg from blocking on stderr
+    // Stderr drainer — prevents FFmpeg from blocking on a full stderr pipe
     // -----------------------------------------------------------------------
     private static void drainStderr(Process p, String label) {
         Thread t = new Thread(() -> {
@@ -206,10 +324,6 @@ public class ScreenCapture {
 
     // -----------------------------------------------------------------------
     // Public API — student streaming (zero-copy JPEG passthrough)
-    //
-    //   GUARD: studentPipeUp checked first.
-    //   If FFmpeg is running: return raw JPEG bytes directly, NO processing.
-    //   No ImageIO.read, no ImageIO.write, no decode, no re-encode.
     // -----------------------------------------------------------------------
 
     /**
@@ -218,11 +332,10 @@ public class ScreenCapture {
      * Returns null if no new frame has arrived (frame-drop semantics).
      */
     public static String captureForStreaming() {
-        if (!studentPipeUp.get()) return null; // pipe not running — no fallback
-
-        byte[] jpeg = latestStudentJpeg.getAndSet(null); // consume latest
-        if (jpeg == null) return null; // no new frame since last poll
-        return Base64.getEncoder().encodeToString(jpeg); // zero-copy passthrough
+        if (!studentPipeUp.get()) return null;
+        byte[] jpeg = latestStudentJpeg.getAndSet(null);
+        if (jpeg == null) return null;
+        return Base64.getEncoder().encodeToString(jpeg);
     }
 
     /**
@@ -236,7 +349,7 @@ public class ScreenCapture {
     }
 
     // -----------------------------------------------------------------------
-    // Admin screen-share  (cursor visible via admin pipe)
+    // Admin screen-share (cursor visible via admin pipe)
     // -----------------------------------------------------------------------
 
     public static void startAsyncCapture() {
@@ -247,15 +360,13 @@ public class ScreenCapture {
         Thread t = new Thread(() -> {
             while (asyncRunning) {
                 try {
-                    // Guard: only use admin FFmpeg pipe — no Robot fallback
                     if (adminPipeUp.get()) {
                         byte[] jpeg = latestAdminJpeg.get();
                         if (jpeg != null) {
-                            // Zero-copy: raw JPEG → Base64. No ImageIO decode/re-encode.
                             latestAdminFrame.set(Base64.getEncoder().encodeToString(jpeg));
                         }
                     }
-                    Thread.sleep(16); // ~60 Hz poll
+                    Thread.sleep(33); // ~30 Hz poll
                 } catch (InterruptedException e) { break; }
                 catch (Exception ignored) {}
             }

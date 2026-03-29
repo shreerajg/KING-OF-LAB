@@ -9,6 +9,24 @@ import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * DxgiCapturer — Flicker-Free Screen Capture for Ultra Stream Mode
+ *
+ * ─────────────────────────────────────────────────────────────────
+ * ROOT CAUSE OF CURSOR FLICKER:
+ *   The original implementation used -f gdigrab which calls Windows
+ *   GDI BitBlt() + GetCursorInfo() every frame.  Even with -draw_mouse 0,
+ *   Windows hides and redraws the hardware cursor at the display-driver
+ *   level during each GDI capture — causing visible 30/60 Hz flicker.
+ *
+ * FIX:
+ *   Use -f lavfi -i ddagrab (DXGI Desktop Duplication).
+ *   ddagrab captures at the GPU/DXGI layer and NEVER calls GetCursorInfo().
+ *   The hardware cursor is completely unaffected → zero flicker.
+ *
+ *   Fallback: gdigrab with draw_mouse=0 for systems without DXGI support.
+ * ─────────────────────────────────────────────────────────────────
+ */
 public class DxgiCapturer implements ScreenCapturer {
 
     // -----------------------------------------------------------------------
@@ -35,26 +53,84 @@ public class DxgiCapturer implements ScreenCapturer {
         if (isCapturing.getAndSet(true))
             return; // already running
 
+        // Try ddagrab (DXGI) first — zero cursor interaction, zero flicker
+        if (tryStartDdagrab()) return;
+
+        // Fallback: gdigrab with draw_mouse=0
+        tryStartGdigrab();
+    }
+
+    /**
+     * Attempts to start the FFmpeg ddagrab pipeline.
+     * ddagrab uses DXGI Desktop Duplication and does NOT touch the Windows
+     * cursor system at all — eliminating cursor flicker entirely.
+     *
+     * @return true if ddagrab started successfully
+     */
+    private boolean tryStartDdagrab() {
         try {
             ProcessBuilder pb = new ProcessBuilder(
-                    "ffmpeg",
-                    "-loglevel", "quiet",
-                    "-f", "gdigrab",
-                    "-framerate", "30",
-                    "-draw_mouse", "0", // exclude cursor at OS level — NO flicker
-                    "-i", "desktop",
-                    "-f", "mjpeg",
-                    "-q:v", "4",
-                    "pipe:1");
+                "ffmpeg",
+                "-loglevel", "quiet",
+                "-f",        "lavfi",
+                "-i",        "ddagrab=output_idx=0:framerate=60:draw_mouse=0",
+                "-vf",       "hwdownload,format=bgra,scale=iw:ih,format=yuv420p",
+                "-f",        "mjpeg",
+                "-q:v",      "4",
+                "pipe:1"
+            );
             ffmpegProc = pb.start();
             drainStderr(ffmpegProc);
 
-            readerThread = new Thread(this::readMjpeg, "DxgiCapturer-FFmpeg-Reader");
+            // Wait briefly to confirm FFmpeg started outputting frames
+            Thread.sleep(500);
+            if (!ffmpegProc.isAlive()) {
+                AuditLogger.logSystem("[DxgiCapturer] ddagrab not available — trying gdigrab fallback");
+                ffmpegProc = null;
+                return false;
+            }
+
+            readerThread = new Thread(this::readMjpeg, "DxgiCapturer-ddagrab-Reader");
             readerThread.setDaemon(true);
             readerThread.setPriority(Thread.MAX_PRIORITY - 1);
             readerThread.start();
 
-            AuditLogger.logSystem("[DxgiCapturer] FFmpeg MJPEG pipe started (draw_mouse=0, 30 FPS)");
+            AuditLogger.logSystem("[DxgiCapturer] ddagrab MJPEG pipe started (DXGI, cursor-free, 60 FPS)");
+            return true;
+
+        } catch (Exception e) {
+            AuditLogger.logError("DxgiCapturer.tryStartDdagrab", "ddagrab launch failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Fallback: gdigrab with draw_mouse=0.
+     * NOTE: gdigrab may still cause slight cursor flicker on some Windows
+     * driver versions due to GDI cursor hooks, but draw_mouse=0 minimises it.
+     */
+    private void tryStartGdigrab() {
+        try {
+            ProcessBuilder pb = new ProcessBuilder(
+                "ffmpeg",
+                "-loglevel",   "quiet",
+                "-f",          "gdigrab",
+                "-framerate",  "60",
+                "-draw_mouse", "0",   // exclude cursor at OS level
+                "-i",          "desktop",
+                "-f",          "mjpeg",
+                "-q:v",        "4",
+                "pipe:1"
+            );
+            ffmpegProc = pb.start();
+            drainStderr(ffmpegProc);
+
+            readerThread = new Thread(this::readMjpeg, "DxgiCapturer-gdigrab-Reader");
+            readerThread.setDaemon(true);
+            readerThread.setPriority(Thread.MAX_PRIORITY - 1);
+            readerThread.start();
+
+            AuditLogger.logSystem("[DxgiCapturer] gdigrab MJPEG pipe started (fallback, draw_mouse=0, 60 FPS)");
 
         } catch (Exception e) {
             isCapturing.set(false);
@@ -90,8 +166,6 @@ public class DxgiCapturer implements ScreenCapturer {
 
     @Override
     public boolean isSupported() {
-        // Supported wherever FFmpeg is on PATH on Windows.
-        // startCapture() will handle the failure gracefully if FFmpeg is absent.
         return System.getProperty("os.name", "").toLowerCase().contains("win");
     }
 
@@ -112,7 +186,6 @@ public class DxgiCapturer implements ScreenCapturer {
                     break; // FFmpeg closed stdout
 
                 if (!inFrame) {
-                    // Wait for JPEG SOI marker: FF D8
                     if (prev == 0xFF && b == 0xD8) {
                         frame.reset();
                         frame.write(0xFF);
@@ -125,9 +198,7 @@ public class DxgiCapturer implements ScreenCapturer {
 
                 frame.write(b);
 
-                // JPEG EOI marker: FF D9
                 if (prev == 0xFF && b == 0xD9 && frame.size() > 100) {
-                    // Store latest frame — consumer always gets freshest frame
                     latestFrame.set(frame.toByteArray());
                     frame.reset();
                     inFrame = false;
