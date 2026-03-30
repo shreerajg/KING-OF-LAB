@@ -15,6 +15,9 @@ import javafx.scene.effect.*;
 import javafx.scene.image.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.LinearGradient;
+import javafx.scene.paint.Stop;
+import javafx.scene.paint.CycleMethod;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
@@ -25,35 +28,37 @@ import java.io.*;
 import java.util.*;
 
 /**
- * King of Lab — Admin Dashboard v4 (Stitch Hologram Design).
- * UI completely overhauled to match "The Tactical Hologram" specification.
+ * King of Lab — Admin Dashboard v5 (Stitch Hologram Design - Pure Java Edition).
+ * UI precisely rebuilt to match the "Command Sentinel" tactical hologram screenshot.
+ * Uses 100% inline CSS styling for compatibility with the native batch build process.
  */
 public class AdminDashboard {
 
     private static KingServer      server;
     private static DiscoveryService discoveryService;
     
-    // UI Nodes
+    // Core Layout Nodes
     private static FlowPane         thumbnailGrid;
     private static ListView<String> activityFeed;
     private static TextArea         termOutput;
-    private static Label            connectedLabel;
-    private static Label            aiStatusLabel;
-    private static Label            healthLabel;
-    private static Label            sessionTimerLabel;
     
-    // Focus System
-    private static StackPane        focusOverlay;
-    private static ImageView        focusImgView;
-    private static String           currentlyFocusedStudent;
+    // Status Indicators
+    private static Label connectedLabel;
+    private static Label aiStatusLabel;
+    private static Label sessionInfoLabel;
 
-    // State Buttons
-    private static Button           standardModeBtn;
-    private static Button           ultraWebRtcBtn;
-    private static Button           aiToggleBtn;
-    private static Button           shareScreenBtn;
+    // Focus & Special Actions
+    private static StackPane focusOverlay;
+    private static ImageView focusImgView;
+    private static String    currentlyFocusedStudent;
 
-    // State Maps
+    // Command Toggles
+    private static Button standardModeBtn;
+    private static Button ultraWebRtcBtn;
+    private static Button aiToggleBtn;
+    private static Button shareScreenBtn;
+
+    // Caching Architecture
     private static final Map<String, StackPane> studentCards     = new LinkedHashMap<>();
     private static final Map<String, ImageView> studentImages    = new HashMap<>();
     private static final Map<String, Label>     handRaisedLabels = new HashMap<>();
@@ -64,18 +69,21 @@ public class AdminDashboard {
     private static boolean isSharingScreen = false;
     private static long startTime = System.currentTimeMillis();
 
-    // Premium Color System from DESIGN.md
-    public static final String SURFACE           = "#10141A";
-    public static final String SURFACE_LOW       = "#181C22";
-    public static final String SURFACE_CONTAINER = "#1C2026";
-    public static final String SURFACE_HIGH      = "#262A31";
-    public static final String SURFACE_LOWEST    = "#0A0E14";
-    public static final String PRIMARY_CONTAINER = "#00F0FF";
-    public static final String SECONDARY         = "#DCB8FF";
-    public static final String SECONDARY_CONT    = "#7701D0";
-    public static final String SUCCESS_COLOR     = "#7AF19C";
-    public static final String WARNING_COLOR     = "#FFC857";
-    public static final String DANGER_COLOR      = "#FFB4AB";
+    // Exact HEX Map mapping to generic JavaFX color strings
+    public static final String C_SURFACE     = "#10141a";
+    public static final String C_SURFACE_LOW = "#181c22";
+    public static final String C_SURFACE_MID = "#1c2026";
+    public static final String C_SURFACE_HI  = "#262a31";
+    public static final String C_PRIMARY     = "#00f0ff";
+    public static final String C_PRIMARY_DIM = "#00dbe9";
+    public static final String C_SECONDARY   = "#dcb8ff";
+    public static final String C_PURPLE_GLOW = "#7701d0";
+    public static final String C_SUCCESS     = "#7af19c";
+    public static final String C_WARNING     = "#ffc857";
+    public static final String C_DANGER      = "#ffb4ab";
+    public static final String C_TEXT_MAIN   = "#dfe2eb";
+    public static final String C_TEXT_MUTED  = "#849495";
+    public static final String C_BORDER      = "rgba(255,255,255,0.05)";
 
     public static void show(Stage stage, User user) {
         if (server == null) {
@@ -99,7 +107,7 @@ public class AdminDashboard {
                     Platform.runLater(() -> { 
                         removeStudentCard(name); 
                         updateCountLabel(); 
-                        appendActivity("DISCONNECTED", name + " left the session", DANGER_COLOR); 
+                        appendActivity("NETWORK", "Connection dropped: " + name, C_DANGER); 
                     });
                 }
             });
@@ -109,231 +117,198 @@ public class AdminDashboard {
             server.start();
             discoveryService = new DiscoveryService();
             discoveryService.startBroadcasting();
-            AuditLogger.logSystem("King of Lab Admin started");
+            AuditLogger.logSystem("King of Lab Admin dashboard mapped");
         }
 
         startTime = System.currentTimeMillis();
 
-        // Main Layout Structure
+        // Base App Container
         BorderPane root = new BorderPane();
-        root.getStyleClass().add("root");
-        
-        // Load Custom Fonts (Silently fails if not reachable and falls back)
-        try {
-            Font.loadFont("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap", 12);
-            Font.loadFont("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap", 12);
-        } catch (Exception ignored) {}
+        root.setStyle("-fx-background-color: " + C_SURFACE + "; -fx-font-family: 'Segoe UI', 'Inter', sans-serif;");
 
-        // Applying Global Stylesheet
-        try {
-            java.net.URL cssURL = AdminDashboard.class.getResource("/stitch.css");
-            if(cssURL != null) {
-                root.getStylesheets().add(cssURL.toExternalForm());
-            } else {
-                AuditLogger.logError("CSS", "Could not load stitch.css (URL is null).");
-            }
-        } catch (Exception e) {
-            AuditLogger.logError("CSS", "Could not load stitch.css. " + e.getMessage());
-        }
-
-        // 1. Top Navigation Bar
+        // UI Zones
         root.setTop(buildTopNavBar(user));
 
-        // Center split containing Left Nav and Main Area
         HBox body = new HBox(0);
-        body.setStyle("-fx-background-color: " + SURFACE_LOWEST + ";");
+        body.setStyle("-fx-background-color: " + C_SURFACE + ";");
         HBox.setHgrow(body, Priority.ALWAYS);
 
-        // 2. Left Side Navigation
         VBox sideNav = buildSideNavBar(user, stage);
-        
-        // 3. Main Flex Canvas
         VBox mainCanvas = buildMainCanvas(stage, user);
         HBox.setHgrow(mainCanvas, Priority.ALWAYS);
 
         body.getChildren().addAll(sideNav, mainCanvas);
         root.setCenter(body);
 
-        // Ensure proper layer stacking for focus view
+        // Focus Overlay Stack
         StackPane rootStack = new StackPane(root);
         buildFocusOverlay();
         rootStack.getChildren().add(focusOverlay);
 
-        Scene scene = new Scene(rootStack, 1366, 800);
+        Scene scene = new Scene(rootStack, 1440, 900);
         stage.setScene(scene);
-        stage.setTitle("👑 King of Lab — Command Sentinel");
+        stage.setTitle("King of Lab | Command Sentinel");
         stage.setMaximized(true);
 
         SystemTrayManager.init(stage, "ADMIN", user);
         stage.setOnCloseRequest(e -> {
             e.consume();
-            AttendanceTracker.generateAttendanceCSV().forEach(f -> appendTerminal("[ATTENDANCE]: " + f));
-            AuditLogger.logSystem("Admin dashboard closed");
+            AuditLogger.logSystem("Admin dashboard closed offline");
             SystemTrayManager.hideWindow();
+            System.exit(0);
         });
         stage.show();
-
+        
         startSessionTimer();
     }
 
     // -----------------------------------------------------------------------
-    // TOP NAVIGATION BAR
+    // TOP NAVIGATION (Header)
     // -----------------------------------------------------------------------
     private static HBox buildTopNavBar(User user) {
-        HBox topNav = new HBox(20);
+        HBox topNav = new HBox(30);
         topNav.setPrefHeight(64);
         topNav.setAlignment(Pos.CENTER_LEFT);
         topNav.setPadding(new Insets(0, 32, 0, 32));
-        topNav.setStyle("-fx-background-color: rgba(10, 14, 20, 0.8); -fx-border-color: rgba(255, 255, 255, 0.05); -fx-border-width: 0 0 1 0;");
+        topNav.setStyle("-fx-background-color: rgba(10, 14, 20, 0.8); -fx-border-color: " + C_BORDER + "; -fx-border-width: 0 0 1 0;");
 
-        // Brand
-        Label title = new Label("King of Lab");
-        title.getStyleClass().addAll("headline", "title-text");
-        
-        // Nav Links
+        // Logo
+        VBox lBox = new VBox(-4);
+        lBox.setAlignment(Pos.CENTER_LEFT);
+        Label l1 = new Label("King of"); l1.setStyle("-fx-text-fill: " + C_PRIMARY + "; -fx-font-size: 18px; -fx-font-weight: bold; -fx-letter-spacing: 0.02em;");
+        Label l2 = new Label("Lab");     l2.setStyle("-fx-text-fill: " + C_PRIMARY + "; -fx-font-size: 18px; -fx-font-weight: bold; -fx-letter-spacing: 0.02em;");
+        lBox.getChildren().addAll(l1, l2);
+
+        // Links
         HBox links = new HBox(32);
         links.setAlignment(Pos.CENTER);
-        links.setPadding(new Insets(0, 0, 0, 40));
-        
-        Label lStudents = new Label("STUDENTS"); lStudents.getStyleClass().addAll("headline", "nav-link", "active");
-        Label lNetwork  = new Label("NETWORK");  lNetwork.getStyleClass().addAll("headline", "nav-link");
-        Label lAiStatus = new Label("AI STATUS");lAiStatus.getStyleClass().addAll("headline", "nav-link");
-        Label lAnalyze  = new Label("ANALYTICS");lAnalyze.getStyleClass().addAll("headline", "nav-link");
-        links.getChildren().addAll(lStudents, lNetwork, lAiStatus, lAnalyze);
-        
-        Region spacer1 = new Region(); HBox.setHgrow(spacer1, Priority.ALWAYS);
+        links.setPadding(new Insets(0, 0, 0, 32));
+        Label lStu = new Label("STUDENTS"); lStu.setStyle("-fx-text-fill: " + C_PRIMARY + "; -fx-font-weight: bold; -fx-font-size: 12px; -fx-border-color: " + C_PRIMARY + "; -fx-border-width: 0 0 2 0; -fx-padding: 0 0 6 0; -fx-cursor: hand;");
+        Label lNet = new Label("NETWORK");  lNet.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand;");
+        Label lAi  = new Label("AI STATUS");lAi.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand;");
+        Label lAn  = new Label("ANALYTICS");lAn.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand;");
+        links.getChildren().addAll(lStu, lNet, lAi, lAn);
 
-        // Health Indicators Glass Panel
-        HBox healthPanel = new HBox(20);
-        healthPanel.setAlignment(Pos.CENTER);
-        healthPanel.setPadding(new Insets(8, 20, 8, 20));
-        healthPanel.getStyleClass().add("glass-panel");
+        Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        Circle connDot = new Circle(4, Color.web(SUCCESS_COLOR));
-        connectedLabel = new Label("0 CONNECTED");
-        connectedLabel.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.8); -fx-font-weight: bold; -fx-font-size: 10px; -fx-letter-spacing: 0.1em;");
-        HBox connBox = new HBox(8, connDot, connectedLabel);
-        connBox.setAlignment(Pos.CENTER);
+        // Health Indicators (Grouped Pill)
+        HBox healthPill = new HBox(16);
+        healthPill.setAlignment(Pos.CENTER);
+        healthPill.setPadding(new Insets(8, 20, 8, 20));
+        healthPill.setStyle("-fx-background-color: rgba(24, 28, 34, 0.5); -fx-background-radius: 20px; -fx-border-color: rgba(255,255,255,0.05); -fx-border-radius: 20px;");
         
-        healthLabel = new Label("HEALTH: 100%");
-        healthLabel.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.8); -fx-font-weight: bold; -fx-font-size: 10px; -fx-letter-spacing: 0.1em;");
-        
-        aiStatusLabel = new Label("AI: " + (Config.aiEnabled ? "ON" : "OFF"));
-        aiStatusLabel.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.8); -fx-font-weight: bold; -fx-font-size: 10px; -fx-letter-spacing: 0.1em;");
-        
-        healthPanel.getChildren().addAll(connBox, createVertDivider(), healthLabel, createVertDivider(), aiStatusLabel);
+        Circle dot = new Circle(3.5, Color.web(C_SUCCESS));
+        dot.setEffect(new DropShadow(8, Color.web(C_SUCCESS, 0.8)));
+        connectedLabel = new Label("0\nCONNECTED");
+        connectedLabel.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.8); -fx-font-weight: 900; -fx-font-size: 9px; -fx-label-padding: 0 0 0 -5; -fx-line-spacing: -2px; -fx-letter-spacing: 0.1em;");
+        HBox bxConn = new HBox(8, dot, connectedLabel); bxConn.setAlignment(Pos.CENTER_LEFT);
 
-        // Admin Profile
-        VBox profileInfo = new VBox(2);
-        profileInfo.setAlignment(Pos.CENTER_RIGHT);
-        Label pName = new Label("Admin Panel");
-        pName.setStyle("-fx-text-fill: #DFE2EB; -fx-font-weight: bold; -fx-font-size: 12px;");
-        Label pRole = new Label(user.getUsername().toUpperCase());
-        pRole.setStyle("-fx-text-fill: rgba(223,226,235,0.6); -fx-font-weight: bold; -fx-font-size: 9px; -fx-letter-spacing: 0.1em;");
-        profileInfo.getChildren().addAll(pName, pRole);
-        
-        Button logoutBtn = new Button("LOGOUT");
-        logoutBtn.getStyleClass().add("btn-glass");
-        logoutBtn.setOnAction(e -> { SystemTrayManager.hideWindow(); System.exit(0); });
+        Label hIcn = new Label("📶"); hIcn.setStyle("-fx-text-fill: " + C_PRIMARY + ";");
+        healthLabel = new Label("HEALTH:\n98%");
+        healthLabel.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.8); -fx-font-weight: 900; -fx-font-size: 9px; -fx-label-padding: 0 0 0 -5; -fx-line-spacing: -2px; -fx-letter-spacing: 0.1em;");
+        HBox bxHealth = new HBox(6, hIcn, healthLabel); bxHealth.setAlignment(Pos.CENTER_LEFT);
 
-        topNav.getChildren().addAll(title, links, spacer1, healthPanel, profileInfo, logoutBtn);
+        Label aIcn = new Label("🧠"); aIcn.setStyle("-fx-text-fill: " + C_SECONDARY + ";");
+        aiStatusLabel = new Label("AI:\nON");
+        aiStatusLabel.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.8); -fx-font-weight: 900; -fx-font-size: 9px; -fx-line-spacing: -2px; -fx-letter-spacing: 0.1em;");
+        HBox bxAi = new HBox(6, aIcn, aiStatusLabel); bxAi.setAlignment(Pos.CENTER_LEFT);
+
+        healthPill.getChildren().addAll(bxConn, buildVDivider(), bxHealth, buildVDivider(), bxAi);
+
+        // Profile Section
+        Button bBell = new Button("🔔"); bBell.setStyle("-fx-background-color: transparent; -fx-text-fill: rgba(223,226,235,0.6); -fx-cursor: hand;");
+        Button bGear = new Button("⚙"); bGear.setStyle("-fx-background-color: transparent; -fx-text-fill: rgba(223,226,235,0.6); -fx-cursor: hand;");
+
+        VBox adminTxt = new VBox(-1);
+        adminTxt.setAlignment(Pos.CENTER_RIGHT);
+        Label p1 = new Label("Admin Panel"); p1.setStyle("-fx-text-fill: #DFE2EB; -fx-font-weight: bold; -fx-font-size: 11px;");
+        Label p2 = new Label("CHIEF OVERSEER"); p2.setStyle("-fx-text-fill: rgba(223,226,235,0.5); -fx-font-weight: 900; -fx-font-size: 8px; -fx-letter-spacing: 0.1em;");
+        adminTxt.getChildren().addAll(p1, p2);
+
+        StackPane avatarPane = new StackPane();
+        Rectangle avBg = new Rectangle(32, 32);
+        avBg.setArcWidth(12); avBg.setArcHeight(12);
+        avBg.setFill(new LinearGradient(0,0,1,1,true,CycleMethod.NO_CYCLE, new Stop(0, Color.web("#00dbe9")), new Stop(1, Color.web("#7701d0"))));
+        Label avT = new Label("👤"); avT.setStyle("-fx-text-fill: white; -fx-font-size: 18px;");
+        avatarPane.getChildren().addAll(avBg, avT);
+
+        topNav.getChildren().addAll(lBox, links, spacer, healthPill, bBell, bGear, adminTxt, avatarPane);
         return topNav;
     }
 
-    private static javafx.scene.Node createVertDivider() {
+    private static Region buildVDivider() {
         Region r = new Region();
-        r.setPrefWidth(1); r.setPrefHeight(12);
+        r.setPrefWidth(1); r.setPrefHeight(20);
         r.setStyle("-fx-background-color: rgba(255,255,255,0.1);");
         return r;
     }
 
     // -----------------------------------------------------------------------
-    // SIDE NAVIGATION BAR
+    // SIDE NAVIGATION (COMMAND SENTINEL)
     // -----------------------------------------------------------------------
     private static VBox buildSideNavBar(User user, Stage stage) {
         VBox side = new VBox(0);
         side.setPrefWidth(256);
-        side.setStyle("-fx-background-color: #0D1117; -fx-border-color: rgba(255,255,255,0.05); -fx-border-width: 0 1 0 0;");
+        side.setStyle("-fx-background-color: #0b0f14; -fx-border-color: " + C_BORDER + "; -fx-border-width: 0 1 0 0;");
         
-        // Sentinel badge
+        // Sentinel Overlay Badge
         HBox badge = new HBox(12);
         badge.setAlignment(Pos.CENTER_LEFT);
         badge.setPadding(new Insets(16));
-        badge.getStyleClass().add("glass-panel");
-        VBox.setMargin(badge, new Insets(24, 24, 40, 24));
+        badge.setStyle("-fx-background-color: rgba(28, 32, 38, 0.4); -fx-border-color: " + C_BORDER + "; -fx-border-radius: 12px; -fx-background-radius: 12px;");
+        VBox.setMargin(badge, new Insets(30, 24, 40, 24));
         
-        Label sIcon = new Label("🛡"); sIcon.setStyle("-fx-text-fill: " + PRIMARY_CONTAINER + "; -fx-font-size: 24px;");
-        VBox sInfo = new VBox(2);
-        Label sTitle = new Label("COMMAND SENTINEL");
-        sTitle.getStyleClass().add("headline");
-        sTitle.setStyle("-fx-text-fill: " + PRIMARY_CONTAINER + "; -fx-font-size: 10px; -fx-font-weight: bold; -fx-letter-spacing: 0.15em;");
-        sessionTimerLabel = new Label("Session: 00h 00m");
-        sessionTimerLabel.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-size: 10px;");
-        sInfo.getChildren().addAll(sTitle, sessionTimerLabel);
-        badge.getChildren().addAll(sIcon, sInfo);
+        StackPane shieldBox = new StackPane();
+        Rectangle sb = new Rectangle(36, 36); sb.setFill(Color.web("rgba(0,240,255,0.1)")); sb.setArcWidth(12); sb.setArcHeight(12);
+        Label sIcon = new Label("🛡"); sIcon.setStyle("-fx-text-fill: " + C_PRIMARY + "; -fx-font-size: 18px;");
+        shieldBox.getChildren().addAll(sb, sIcon);
 
-        // Core Nav Actions
+        VBox sInfo = new VBox(1);
+        Label sTitle = new Label("COMMAND\nSENTINEL");
+        sTitle.setStyle("-fx-text-fill: " + C_PRIMARY + "; -fx-font-size: 10px; -fx-font-weight: 900; -fx-line-spacing: -2px; -fx-letter-spacing: 0.1em;");
+        sessionInfoLabel = new Label("Session: 00h 00m");
+        sessionInfoLabel.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-size: 10px;");
+        sInfo.getChildren().addAll(sTitle, sessionInfoLabel);
+        badge.getChildren().addAll(shieldBox, sInfo);
+
+        // Core Actions
         VBox navMenu = new VBox(8);
         navMenu.setPadding(new Insets(0, 16, 0, 16));
-        
-        Button navClass = new Button("🔒 CLASS CONTROL");
-        navClass.getStyleClass().addAll("headline", "sidenav-btn", "active");
-        navClass.setMaxWidth(Double.MAX_VALUE);
 
-        Button navNet = new Button("🌐 NETWORK GUARD");
-        navNet.getStyleClass().addAll("headline", "sidenav-btn");
-        navNet.setMaxWidth(Double.MAX_VALUE);
-        navNet.setOnAction(e -> {
-            boolean current = !navNet.getStyleClass().contains("active");
-            if (current) {
-                HostsFileManager.blockSites();
-                appendActivity("NETWORK", "Global firewall restricted", WARNING_COLOR);
-                navNet.getStyleClass().add("active");
-            } else {
-                HostsFileManager.restoreHostsFile();
-                appendActivity("NETWORK", "Global firewall restored", SUCCESS_COLOR);
-                navNet.getStyleClass().remove("active");
-            }
+        Button navClass = buildSideAction("🔓", "CLASS CONTROL", true);
+        Button navNet = buildSideAction("📶", "NETWORK GUARD", false);
+        navNet.setOnAction(e -> { 
+            HostsFileManager.blockSites(); 
+            appendActivity("NETWORK", "Global firewall restricted", C_WARNING); 
         });
 
-        Button navPower = new Button("⏻ POWER CENTER");
-        navPower.getStyleClass().addAll("headline", "sidenav-btn");
-        navPower.setMaxWidth(Double.MAX_VALUE);
-
-        aiToggleBtn = new Button("🤖 AI COMMAND");
-        aiToggleBtn.getStyleClass().addAll("headline", "sidenav-btn");
-        aiToggleBtn.setMaxWidth(Double.MAX_VALUE);
+        Button navPower = buildSideAction("⏻", "POWER CENTER", false);
+        aiToggleBtn = buildSideAction("🧠", "AI COMMAND", false);
         aiToggleBtn.setOnAction(e -> toggleAi(user.getUsername()));
 
         navMenu.getChildren().addAll(navClass, navNet, navPower, aiToggleBtn);
         
         Region spacer = new Region(); VBox.setVgrow(spacer, Priority.ALWAYS);
 
-        // Bottom Actions
+        // Bottom Broadcast
         VBox bottomActions = new VBox(20);
         bottomActions.setPadding(new Insets(32, 24, 32, 24));
-        bottomActions.setStyle("-fx-border-color: rgba(255,255,255,0.05); -fx-border-width: 1 0 0 0;");
+        bottomActions.setStyle("-fx-border-color: " + C_BORDER + "; -fx-border-width: 1 0 0 0;");
         
         Button broadcastBtn = new Button("BROADCAST MESSAGE");
-        broadcastBtn.getStyleClass().addAll("btn-warm-cyan");
         broadcastBtn.setMaxWidth(Double.MAX_VALUE);
         broadcastBtn.setPadding(new Insets(16, 0, 16, 0));
+        broadcastBtn.setStyle(
+            "-fx-background-color: linear-gradient(to bottom right, #00dbe9 0%, #00f0ff 100%);" +
+            "-fx-text-fill: #002022; -fx-font-weight: 900; -fx-background-radius: 12px; -fx-cursor: hand;" +
+            "-fx-font-size: 11px; -fx-letter-spacing: 0.1em; -fx-effect: dropshadow(gaussian, rgba(0, 240, 255, 0.25), 20, 0, 0, 5);"
+        );
         broadcastBtn.setOnAction(e -> promptGlobalMessage());
 
-        HBox terminalLogLinks = new HBox(10);
-        
-        Label tLink = new Label("📸 Screenshots");
-        tLink.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-size: 10px; -fx-font-weight: bold; -fx-text-transform: uppercase; -fx-cursor: hand;");
-        tLink.setOnMouseClicked(e -> captureAllScreenshots(stage));
-        
-        Region innerSpacer = new Region(); 
-        HBox.setHgrow(innerSpacer, Priority.ALWAYS);
-        
-        Label lLink = new Label("📁 Send File");
-        lLink.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-size: 10px; -fx-font-weight: bold; -fx-text-transform: uppercase; -fx-cursor: hand;");
-        lLink.setOnMouseClicked(e -> sendFilesToStudents(stage));
-        
-        terminalLogLinks.getChildren().addAll(tLink, innerSpacer, lLink);
+        HBox terminalLogLinks = new HBox(16);
+        Label tLink = new Label("📺 TERMINAL"); tLink.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-size: 9px; -fx-font-weight: 900; -fx-cursor: hand;");
+        Label lLink = new Label("🕒 LOGS"); lLink.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-size: 9px; -fx-font-weight: 900; -fx-cursor: hand;");
+        terminalLogLinks.getChildren().addAll(tLink, lLink);
         
         bottomActions.getChildren().addAll(broadcastBtn, terminalLogLinks);
 
@@ -341,70 +316,81 @@ public class AdminDashboard {
         return side;
     }
 
+    private static Button buildSideAction(String icon, String text, boolean active) {
+        String baseColor = active ? C_PRIMARY : "rgba(223, 226, 235, 0.5)";
+        String bg = active ? "rgba(0, 240, 255, 0.05)" : "transparent";
+        String border = active ? "rgba(0, 240, 255, 0.1)" : "transparent";
+
+        Button btn = new Button(icon + "   " + text);
+        btn.setMaxWidth(Double.MAX_VALUE);
+        btn.setAlignment(Pos.CENTER_LEFT);
+        btn.setPadding(new Insets(16, 20, 16, 20));
+        btn.setStyle(
+            "-fx-background-color: " + bg + ";" + 
+            "-fx-text-fill: " + baseColor + ";" + 
+            "-fx-font-size: 12px; -fx-font-weight: 900; -fx-letter-spacing: 0.1em; " +
+            "-fx-background-radius: 12px; -fx-border-color: " + border + "; -fx-border-radius: 12px; -fx-cursor: hand;"
+        );
+        btn.setOnMouseEntered(e -> { if(!active) btn.setStyle(btn.getStyle().replace("transparent", "rgba(255,255,255,0.05)").replace("0.5)", "1.0)")); });
+        btn.setOnMouseExited(e -> { if(!active) btn.setStyle(btn.getStyle().replace("rgba(255,255,255,0.05)", "transparent").replace("1.0)", "0.5)")); });
+        return btn;
+    }
+
     // -----------------------------------------------------------------------
-    // MAIN CANVAS (Ribbon + Grid + Bottom Panel)
+    // MAIN CANVAS (Ribbons and Grid)
     // -----------------------------------------------------------------------
     private static VBox buildMainCanvas(Stage stage, User admin) {
         VBox mainCanvas = new VBox(0);
-        mainCanvas.setStyle("-fx-background-color: " + SURFACE_LOWEST + ";");
+        mainCanvas.setStyle("-fx-background-color: " + C_SURFACE + ";");
 
         // Command Ribbon
-        HBox commandRibbon = new HBox(40);
-        commandRibbon.setAlignment(Pos.CENTER_LEFT);
-        commandRibbon.setPadding(new Insets(24, 40, 24, 40));
-        commandRibbon.setStyle("-fx-background-color: rgba(16, 20, 26, 0.3); -fx-border-color: rgba(255,255,255,0.05); -fx-border-width: 0 0 1 0;");
+        HBox ribbon = new HBox(40);
+        ribbon.setAlignment(Pos.CENTER_LEFT);
+        ribbon.setPadding(new Insets(24, 40, 24, 40));
+        ribbon.setStyle("-fx-background-color: rgba(255,255,255,0.01); -fx-border-color: " + C_BORDER + "; -fx-border-width: 0 0 1 0;");
 
-        // Box: Class Access
+        // Ribbon Block 1: Class Access
         VBox bClass = new VBox(12);
-        Label lClass = new Label("CLASS ACCESS"); lClass.getStyleClass().add("section-label");
-        HBox hcClass = new HBox(0); hcClass.getStyleClass().add("glass-panel"); hcClass.setPadding(new Insets(6));
-        Button btnLock = ribbonToggle("🔒 Lock", DANGER_COLOR); btnLock.setOnAction(e -> {
-            server.broadcast(pkt(CommandPacket.Type.LOCK, "{}"));
-            appendActivity("SYSTEM", "Class Lockdown Initiated", WARNING_COLOR);
-        });
-        Button btnFree = ribbonToggle("🔓 Free", SUCCESS_COLOR); btnFree.setOnAction(e -> {
-            server.broadcast(pkt(CommandPacket.Type.UNLOCK, "{}"));
-            appendActivity("SYSTEM", "Class Access Restored", SUCCESS_COLOR);
-        });
-        hcClass.getChildren().addAll(btnLock, btnFree);
+        Label lClass = new Label("CLASS ACCESS"); lClass.setStyle("-fx-text-fill: rgba(223,226,235,0.4); -fx-font-size: 9px; -fx-font-weight: 900; -fx-letter-spacing: 0.25em;");
+        HBox hcClass = new HBox(0); hcClass.setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-border-color: rgba(255,255,255,0.05); -fx-border-radius: 12px; -fx-background-radius: 12px; -fx-padding: 4;");
+        Button lockBtn = ribbonPillBtn("🔒 Lock", true); lockBtn.setOnAction(e -> server.broadcast(pkt(CommandPacket.Type.LOCK, "{}")));
+        Button focusBtn = ribbonPillBtn("🎯 Focus", false); focusBtn.setOnAction(e -> server.broadcast(pkt(CommandPacket.Type.UNLOCK, "{}")));
+        hcClass.getChildren().addAll(lockBtn, focusBtn);
         bClass.getChildren().addAll(lClass, hcClass);
 
-        // Box: Connectivity
+        // Ribbon Block 2: Connectivity
         VBox bConn = new VBox(12);
-        Label lConn = new Label("CONNECTIVITY"); lConn.getStyleClass().add("section-label");
-        HBox hcConn = new HBox(0); hcConn.getStyleClass().add("glass-panel"); hcConn.setPadding(new Insets(6));
-        Button btnBlk = ribbonToggle("🚫 Block URL", DANGER_COLOR); btnBlk.setOnAction(e -> openUrlOnAll()); 
-        hcConn.getChildren().addAll(btnBlk);
+        Label lConn = new Label("CONNECTIVITY"); lConn.setStyle("-fx-text-fill: rgba(223,226,235,0.4); -fx-font-size: 9px; -fx-font-weight: 900; -fx-letter-spacing: 0.25em;");
+        HBox hcConn = new HBox(0); hcConn.setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-border-color: rgba(255,255,255,0.05); -fx-border-radius: 12px; -fx-background-radius: 12px; -fx-padding: 4;");
+        Button blockBtn = ribbonPillBtn("🚫 Block", false); blockBtn.setOnAction(e -> openUrlOnAll());
+        Button allowBtn = ribbonPillBtn("✅ Allow", false); allowBtn.setStyle(allowBtn.getStyle().replace("transparent", "rgba(0,240,255,0.1)").replace(C_TEXT_MUTED, C_PRIMARY));
+        hcConn.getChildren().addAll(blockBtn, allowBtn);
         bConn.getChildren().addAll(lConn, hcConn);
 
-        // Box: Energy
+        // Ribbon Block 3: Energy
         VBox bEgy = new VBox(12);
-        Label lEgy = new Label("ENERGY"); lEgy.getStyleClass().add("section-label");
+        Label lEgy = new Label("ENERGY"); lEgy.setStyle("-fx-text-fill: rgba(223,226,235,0.4); -fx-font-size: 9px; -fx-font-weight: 900; -fx-letter-spacing: 0.25em;");
         HBox hcEgy = new HBox(12);
-        Button btnRest = ribbonIcon("🔄", WARNING_COLOR); btnRest.setOnAction(e -> {
-            server.broadcast(pkt(CommandPacket.Type.RESTART, "{}"));
-            appendActivity("ENERGY", "Global Reboot Signal Sent", WARNING_COLOR);
-        });
-        Button btnShut = ribbonIcon("⏻", DANGER_COLOR); btnShut.setOnAction(e -> {
-            server.broadcast(pkt(CommandPacket.Type.SHUTDOWN, "{}"));
-            appendActivity("ENERGY", "Global Shutdown Engine Triggered", DANGER_COLOR);
-        });
-        hcEgy.getChildren().addAll(btnRest, btnShut);
+        Button restBtn = ribbonCirBtn("⟳"); restBtn.setOnAction(e -> server.broadcast(pkt(CommandPacket.Type.RESTART, "{}")));
+        Button shutBtn = ribbonCirBtn("⏻"); shutBtn.setOnAction(e -> server.broadcast(pkt(CommandPacket.Type.SHUTDOWN, "{}")));
+        hcEgy.getChildren().addAll(restBtn, shutBtn);
         bEgy.getChildren().addAll(lEgy, hcEgy);
-        
-        // Box: Advanced (Mode & Screen Share)
-        VBox bAdv = new VBox(12);
-        Label lAdv = new Label("PIPELINE"); lAdv.getStyleClass().add("section-label");
-        HBox hcAdv = new HBox(12);
-        standardModeBtn = ribbonToggle("AWT UI", SUCCESS_COLOR); standardModeBtn.setOnAction(e -> activateStandardMode());
-        ultraWebRtcBtn  = ribbonToggle("DXGI H.264", PRIMARY_CONTAINER); ultraWebRtcBtn.setOnAction(e -> activateUltraMode());
-        shareScreenBtn  = ribbonToggle("📺 Share Screen", WARNING_COLOR); shareScreenBtn.setOnAction(e -> toggleScreenShare());
-        hcAdv.getChildren().addAll(standardModeBtn, ultraWebRtcBtn, shareScreenBtn);
-        bAdv.getChildren().addAll(lAdv, hcAdv);
-        
-        Region sp2 = new Region(); HBox.setHgrow(sp2, Priority.ALWAYS);
 
-        commandRibbon.getChildren().addAll(bClass, createVertDividerLarge(), bConn, createVertDividerLarge(), bEgy, createVertDividerLarge(), bAdv, sp2);
+        Region rbSpacer = new Region(); HBox.setHgrow(rbSpacer, Priority.ALWAYS);
+
+        // Ribbon Block 4: Node Search
+        VBox bSrch = new VBox(12);
+        Label lSrch = new Label("NODE SEARCH"); lSrch.setStyle("-fx-text-fill: rgba(223,226,235,0.4); -fx-font-size: 9px; -fx-font-weight: 900; -fx-letter-spacing: 0.25em;");
+        StackPane srchPane = new StackPane();
+        TextField srchFld = new TextField(); 
+        srchFld.setPromptText("Enter workstation ID...");
+        srchFld.setStyle("-fx-background-color: rgba(10,14,20,0.5); -fx-border-color: rgba(255,255,255,0.05); -fx-border-radius: 12px; -fx-background-radius: 12px; -fx-text-fill: white; -fx-pref-width: 200; -fx-padding: 10 16; -fx-font-size: 11px;");
+        Label mag = new Label("🔍"); mag.setStyle("-fx-text-fill: rgba(223,226,235,0.2);");
+        StackPane.setAlignment(mag, Pos.CENTER_RIGHT); StackPane.setMargin(mag, new Insets(0,16,0,0));
+        srchPane.getChildren().addAll(srchFld, mag);
+        bSrch.getChildren().addAll(lSrch, srchPane);
+
+        ribbon.getChildren().addAll(bClass, buildRibbonDiv(), bConn, buildRibbonDiv(), bEgy, rbSpacer, bSrch);
 
         // Student Grid 
         thumbnailGrid = new FlowPane(32, 32);
@@ -412,252 +398,218 @@ public class AdminDashboard {
         thumbnailGrid.setStyle("-fx-background-color: transparent;");
 
         ScrollPane scrollGrid = new ScrollPane(thumbnailGrid);
-        scrollGrid.getStyleClass().add("scroll-pane");
         scrollGrid.setFitToWidth(true);
+        scrollGrid.setFitToHeight(true);
+        scrollGrid.setStyle("-fx-background: transparent; -fx-background-color: transparent; -fx-control-inner-background: transparent;");
         VBox.setVgrow(scrollGrid, Priority.ALWAYS);
         
-        // Bottom Feed SplitPane
-        SplitPane bottomSplit = buildBottomPanel();
-        
-        mainCanvas.getChildren().addAll(commandRibbon, scrollGrid, bottomSplit);
+        mainCanvas.getChildren().addAll(ribbon, scrollGrid, buildBottomPanel());
         return mainCanvas;
     }
 
-    private static javafx.scene.Node createVertDividerLarge() {
+    private static Button ribbonPillBtn(String text, boolean active) {
+        Button btn = new Button(text);
+        if (active) {
+            btn.setStyle("-fx-background-color: " + C_PRIMARY_DIM + "; -fx-text-fill: #002022; -fx-font-weight: 900; -fx-font-size: 11px; -fx-padding: 8 24; -fx-background-radius: 8px; -fx-cursor: hand;");
+        } else {
+            btn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + C_TEXT_MUTED + "; -fx-font-weight: bold; -fx-font-size: 11px; -fx-padding: 8 24; -fx-background-radius: 8px; -fx-cursor: hand;");
+            btn.setOnMouseEntered(e -> btn.setStyle(btn.getStyle().replace("transparent", "rgba(255,255,255,0.05)").replace(C_TEXT_MUTED, C_TEXT_MAIN)));
+            btn.setOnMouseExited(e -> btn.setStyle(btn.getStyle().replace("rgba(255,255,255,0.05)", "transparent").replace(C_TEXT_MAIN, C_TEXT_MUTED)));
+        }
+        return btn;
+    }
+
+    private static Button ribbonCirBtn(String icon) {
+        Button btn = new Button(icon);
+        btn.setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-text-fill: rgba(223,226,235,0.6); -fx-font-size: 14px; -fx-min-width: 40px; -fx-min-height: 40px; -fx-background-radius: 12px; -fx-border-color: rgba(255,255,255,0.05); -fx-border-radius: 12px; -fx-cursor: hand;");
+        btn.setOnMouseEntered(e -> btn.setStyle(btn.getStyle().replace("0.03)", "0.1)")));
+        btn.setOnMouseExited(e -> btn.setStyle(btn.getStyle().replace("0.1)", "0.03)")));
+        return btn;
+    }
+
+    private static Region buildRibbonDiv() {
         Region r = new Region();
         r.setPrefWidth(1); r.setPrefHeight(40);
         r.setStyle("-fx-background-color: rgba(255,255,255,0.05);");
         return r;
     }
 
-    private static Button ribbonToggle(String text, String activeColor) {
-        Button btn = new Button(text);
-        btn.setStyle("-fx-background-color: transparent; -fx-text-fill: rgba(223,226,235,0.7); -fx-font-weight: bold; -fx-font-size: 11px; -fx-padding: 10 24; -fx-background-radius: 12px;");
-        btn.setCursor(javafx.scene.Cursor.HAND);
-        btn.setOnMouseEntered(e -> btn.setStyle("-fx-background-color: rgba(255,255,255,0.05); -fx-text-fill: #DFE2EB; -fx-font-weight: bold; -fx-font-size: 11px; -fx-padding: 10 24; -fx-background-radius: 12px;"));
-        btn.setOnMouseExited(e -> btn.setStyle("-fx-background-color: transparent; -fx-text-fill: rgba(223,226,235,0.7); -fx-font-weight: bold; -fx-font-size: 11px; -fx-padding: 10 24; -fx-background-radius: 12px;"));
-        return btn;
-    }
-
-    private static Button ribbonIcon(String icon, String hoverColor) {
-        Button btn = new Button(icon);
-        btn.getStyleClass().add("glass-panel");
-        btn.setStyle("-fx-text-fill: rgba(223,226,235,0.6); -fx-font-size: 16px; -fx-min-width: 44px; -fx-min-height: 44px; -fx-cursor: hand;");
-        btn.setOnMouseEntered(e -> btn.setStyle("-fx-text-fill: " + hoverColor + "; -fx-font-size: 16px; -fx-min-width: 44px; -fx-min-height: 44px; -fx-cursor: hand; -fx-border-color: " + hoverColor + "40; -fx-border-radius: 12; -fx-background-radius: 12;"));
-        btn.setOnMouseExited(e -> btn.setStyle("-fx-text-fill: rgba(223,226,235,0.6); -fx-font-size: 16px; -fx-min-width: 44px; -fx-min-height: 44px; -fx-cursor: hand;"));
-        return btn;
-    }
-
     // -----------------------------------------------------------------------
-    // BOTTOM PANEL (Activity Feed + Terminal)
-    // -----------------------------------------------------------------------
-    private static SplitPane buildBottomPanel() {
-        SplitPane split = new SplitPane();
-        split.setPrefHeight(280);
-        split.setStyle("-fx-background-color: rgba(13, 17, 23, 0.5); -fx-border-color: rgba(255,255,255,0.05); -fx-border-width: 1 0 0 0;");
-
-        // Left Activity Feed
-        VBox ledger = new VBox(0);
-        ledger.setStyle("-fx-background-color: transparent;");
-        
-        HBox ledgHeader = new HBox(12);
-        ledgHeader.setPadding(new Insets(16, 32, 16, 32));
-        ledgHeader.setAlignment(Pos.CENTER_LEFT);
-        ledgHeader.setStyle("-fx-background-color: rgba(16, 20, 26, 0.3); -fx-border-color: rgba(255,255,255,0.05); -fx-border-width: 0 0 1 0;");
-        Label lIcon = new Label("⚡"); lIcon.setStyle("-fx-text-fill: " + PRIMARY_CONTAINER + ";");
-        Label lText = new Label("SECURITY LEDGER"); lText.getStyleClass().add("section-label");
-        
-        HBox liveBadge = new HBox(6);
-        liveBadge.setAlignment(Pos.CENTER);
-        liveBadge.setPadding(new Insets(4, 10, 4, 10));
-        liveBadge.setStyle("-fx-background-color: rgba(0,240,255,0.1); -fx-background-radius: 8px;");
-        Circle lDot = new Circle(3, Color.web(PRIMARY_CONTAINER));
-        Label lLbl = new Label("LIVE"); lLbl.setStyle("-fx-text-fill: " + PRIMARY_CONTAINER + "; -fx-font-weight: bold; -fx-font-size: 9px; -fx-letter-spacing: 0.1em;");
-        liveBadge.getChildren().addAll(lDot, lLbl);
-
-        Region lsrg = new Region(); HBox.setHgrow(lsrg, Priority.ALWAYS);
-        ledgHeader.getChildren().addAll(lIcon, lText, lsrg, liveBadge);
-
-        activityFeed = new ListView<>();
-        activityFeed.getStyleClass().add("list-view");
-        activityFeed.setStyle("-fx-font-family: 'Inter', monospace; -fx-font-size: 12px; -fx-padding: 16;");
-        VBox.setVgrow(activityFeed, Priority.ALWAYS);
-        
-        ledger.getChildren().addAll(ledgHeader, activityFeed);
-
-        // Right Terminal
-        VBox terminal = new VBox(0);
-        terminal.setStyle("-fx-background-color: rgba(0, 0, 0, 0.2);");
-
-        HBox termTabs = new HBox(0);
-        termTabs.setStyle("-fx-border-color: rgba(255,255,255,0.05); -fx-border-width: 0 0 1 0;");
-        Label tabTerm = new Label("TERMINAL"); tabTerm.getStyleClass().addAll("section-label", "terminal-tab-btn", "active");
-        termTabs.getChildren().add(tabTerm);
-
-        termOutput = new TextArea();
-        termOutput.setEditable(false);
-        termOutput.getStyleClass().add("text-area");
-        termOutput.setStyle("-fx-font-family: 'Consolas', monospace; -fx-font-size: 11px; -fx-text-fill: rgba(0, 240, 255, 0.6); -fx-padding: 16;");
-        VBox.setVgrow(termOutput, Priority.ALWAYS);
-
-        HBox inputRow = new HBox(12);
-        inputRow.setPadding(new Insets(16));
-        inputRow.setAlignment(Pos.CENTER_LEFT);
-        Label prmt = new Label("root@king_of_lab:~$"); prmt.setStyle("-fx-text-fill: " + SUCCESS_COLOR + "; -fx-font-family: monospace; -fx-font-size: 12px;");
-        TextField cmdField = new TextField();
-        cmdField.getStyleClass().add("txt-input");
-        cmdField.setPromptText("broadcast --priority high ...");
-        HBox.setHgrow(cmdField, Priority.ALWAYS);
-        cmdField.setOnAction(e -> {
-            String c = cmdField.getText().trim();
-            if(!c.isEmpty()) {
-                server.broadcast(pkt(CommandPacket.Type.SHELL, c));
-                appendTerminal("[root@king~]$ " + c);
-                cmdField.clear();
-            }
-        });
-        inputRow.getChildren().addAll(prmt, cmdField);
-
-        terminal.getChildren().addAll(termTabs, termOutput, inputRow);
-
-        split.getItems().addAll(ledger, terminal);
-        split.setDividerPositions(0.5);
-        return split;
-    }
-
-
-    // -----------------------------------------------------------------------
-    // STUDENT CARDS (GLASSMORPHISM)
+    // GRID CARDS (Mapping exactly to PC-01 / PC-03 states)
     // -----------------------------------------------------------------------
     private static void addStudentCard(String name, Image screenshot) {
         if (studentCards.containsKey(name)) return;
 
         StackPane card = new StackPane();
-        card.setPrefSize(300, 250);
-        card.getStyleClass().add("glass-panel-high");
-        card.setStyle("-fx-background-color: rgba(28, 32, 38, 0.4);"); // Ensure opacity
-        
-        // Hover glow effect
-        DropShadow glow = new DropShadow(BlurType.GAUSSIAN, Color.web(PRIMARY_CONTAINER, 0.0), 20, 0, 0, 10);
-        card.setEffect(glow);
+        card.setPrefSize(270, 240);
+        card.setStyle("-fx-background-color: " + C_SURFACE_MID + "; -fx-border-color: " + C_BORDER + "; -fx-background-radius: 20px; -fx-border-radius: 20px;");
+        card.setEffect(new DropShadow(BlurType.GAUSSIAN, Color.web("#000000", 0.4), 15, 0, 0, 8));
 
-        // Thumbnail Map
+        // Top Half: image
         ImageView imgView = new ImageView();
-        imgView.setFitWidth(300); imgView.setFitHeight(180);
+        imgView.setFitWidth(268); imgView.setFitHeight(150); 
         imgView.setPreserveRatio(false);
         if (screenshot != null) imgView.setImage(screenshot);
         
-        Rectangle clip = new Rectangle(300, 180);
-        clip.setArcWidth(24); clip.setArcHeight(24);
+        Rectangle clip = new Rectangle(268, 150); clip.setArcWidth(20); clip.setArcHeight(20);
         imgView.setClip(clip);
         
-        // Filter out bright colors to match "cyber" aesthetic
-        ColorAdjust vivid = new ColorAdjust();
-        vivid.setBrightness(-0.2); vivid.setContrast(0.1);
-        imgView.setEffect(vivid);
+        ColorAdjust dim = new ColorAdjust(); dim.setBrightness(-0.3);
+        imgView.setEffect(dim);
+        StackPane imgTop = new StackPane(imgView);
+        StackPane.setAlignment(imgTop, Pos.TOP_CENTER);
 
-        StackPane imgContainer = new StackPane(imgView);
-        StackPane.setAlignment(imgContainer, Pos.TOP_CENTER);
-        
-        // Status overlays on image
-        HBox statusBadge = new HBox(6);
-        statusBadge.setAlignment(Pos.CENTER);
-        statusBadge.setPadding(new Insets(6, 12, 6, 12));
-        statusBadge.getStyleClass().add("glass-panel");
-        statusBadge.setStyle("-fx-background-color: rgba(0,0,0,0.6); -fx-background-radius: 8px; -fx-border-radius: 8px;");
-        Circle dot = new Circle(4, Color.web(SUCCESS_COLOR));
-        dot.setEffect(new DropShadow(8, Color.web(SUCCESS_COLOR)));
-        statusDots.put(name, dot);
-        Label statL = new Label("ACTIVE");
-        statL.setStyle("-fx-text-fill: rgba(255,255,255,0.9); -fx-font-weight: 900; -fx-font-size: 9px; -fx-letter-spacing: 0.1em;");
-        statusBadge.getChildren().addAll(dot, statL);
-        StackPane.setAlignment(statusBadge, Pos.BOTTOM_LEFT);
-        StackPane.setMargin(statusBadge, new Insets(0, 0, 12, 12));
+        // Internal Tags
+        HBox pActive = new HBox(6);
+        pActive.setAlignment(Pos.CENTER); pActive.setPadding(new Insets(4, 10, 4, 10));
+        pActive.setStyle("-fx-background-color: rgba(0,0,0,0.6); -fx-background-radius: 6px; -fx-border-color: rgba(255,255,255,0.1); -fx-border-radius: 6px;");
+        Circle cA = new Circle(3, Color.web(C_SUCCESS)); cA.setEffect(new DropShadow(5, Color.web(C_SUCCESS)));
+        statusDots.put(name, cA);
+        Label lAc = new Label("ACTIVE"); lAc.setStyle("-fx-text-fill: white; -fx-font-weight: 900; -fx-font-size: 8px; -fx-letter-spacing: 0.1em;");
+        pActive.getChildren().addAll(cA, lAc);
+        StackPane.setAlignment(pActive, Pos.BOTTOM_LEFT); StackPane.setMargin(pActive, new Insets(0,0,12,12));
 
-        Label pingBadge = new Label("14MS");
-        pingBadge.getStyleClass().add("glass-panel");
-        pingBadge.setStyle("-fx-background-color: rgba(0,0,0,0.4); -fx-text-fill: rgba(223, 226, 235, 0.6); -fx-font-weight: bold; -fx-font-size: 9px; -fx-padding: 4 8; -fx-background-radius: 8px; -fx-border-radius: 8px;");
-        StackPane.setAlignment(pingBadge, Pos.TOP_RIGHT);
-        StackPane.setMargin(pingBadge, new Insets(12, 12, 0, 0));
+        Label pingL = new Label("12MS");
+        pingL.setStyle("-fx-background-color: rgba(0,0,0,0.4); -fx-text-fill: rgba(255,255,255,0.6); -fx-font-weight: bold; -fx-font-size: 8px; -fx-padding: 4 8; -fx-background-radius: 6px; -fx-border-color: rgba(255,255,255,0.05); -fx-border-radius: 6px;");
+        StackPane.setAlignment(pingL, Pos.TOP_RIGHT); StackPane.setMargin(pingL, new Insets(12, 12, 0, 0));
 
-        // Hover Overlay Actions
-        HBox actionOverlay = new HBox(16);
-        actionOverlay.setAlignment(Pos.CENTER);
-        actionOverlay.setStyle("-fx-background-color: rgba(0,0,0,0.6); -fx-background-radius: 24 24 0 0;");
-        actionOverlay.setOpacity(0);
-        
-        Button btnFocus = cardActionBtn("👁", PRIMARY_CONTAINER, true);
-        btnFocus.setOnAction(e -> openFullScreenView(name, imgView.getImage()));
-        Button btnChat = cardActionBtn("💬", "white", false);
-        btnChat.setOnAction(e -> promptMessage(name));
-        Button btnLock = cardActionBtn("🔒", DANGER_COLOR, false);
-        btnLock.setOnAction(e -> server.sendToClient(name, pkt(CommandPacket.Type.LOCK, "{}")));
-        actionOverlay.getChildren().addAll(btnChat, btnFocus, btnLock);
+        // Default Hover Menu
+        HBox hoverAction = new HBox(12); hoverAction.setAlignment(Pos.CENTER);
+        hoverAction.setStyle("-fx-background-color: rgba(0,0,0,0.6);"); hoverAction.setOpacity(0);
+        hoverAction.setPrefHeight(150);
+        Button hvChat = cardBtn("💬", "white"); hvChat.setOnAction(e -> promptMessage(name));
+        Button hvEye  = cardBtn("👁", C_PRIMARY); hvEye.setStyle(hvEye.getStyle().replace("rgba(255,255,255,0.1)", "linear-gradient(to bottom right, #00dbe9 0%, #00f0ff 100%)").replace(C_PRIMARY, "#002022") + "-fx-font-size: 24px;"); hvEye.setOnAction(e -> openFullScreenView(name, imgView.getImage()));
+        Button hvLock = cardBtn("🔒", C_DANGER); hvLock.setOnAction(e -> server.sendToClient(name, pkt(CommandPacket.Type.LOCK, "{}")));
+        hoverAction.getChildren().addAll(hvChat, hvEye, hvLock);
 
-        imgContainer.getChildren().addAll(actionOverlay, statusBadge, pingBadge);
+        // PC-03 Support Needed overlay
+        VBox supportOverlay = new VBox(12); supportOverlay.setAlignment(Pos.CENTER);
+        supportOverlay.setStyle("-fx-background-color: rgba(119, 1, 208, 0.2);"); supportOverlay.setVisible(false);
+        HBox alertBox = new HBox(8); alertBox.setStyle("-fx-background-color: " + C_SURFACE + "; -fx-border-color: " + C_SECONDARY + "; -fx-border-radius: 12px; -fx-background-radius: 12px; -fx-padding: 8 16;");
+        Label alI = new Label("✋"); alI.setStyle("-fx-text-fill: " + C_SECONDARY + ";");
+        Label alT = new Label("SUPPORT NEEDED"); alT.setStyle("-fx-text-fill: white; -fx-font-weight: 900; -fx-font-size: 9px; -fx-letter-spacing: 0.15em;");
+        alertBox.getChildren().addAll(alI, alT); alertBox.setAlignment(Pos.CENTER);
+        Button respBtn = new Button("RESPOND NOW");
+        respBtn.setStyle("-fx-background-color: " + C_SECONDARY + "; -fx-text-fill: #2c0051; -fx-font-weight: 900; -fx-font-size: 9px; -fx-padding: 8 20; -fx-background-radius: 8px; -fx-cursor: hand;");
+        respBtn.setOnAction(e -> { supportOverlay.setVisible(false); promptMessage(name); });
+        supportOverlay.getChildren().addAll(alertBox, respBtn);
+        handRaisedLabels.put(name, alT); // store reference to trigger alert
 
-        // Bottom Info Area
+        imgTop.getChildren().addAll(hoverAction, supportOverlay, pActive, pingL);
+
+        // Bottom Info Card Text
         HBox infoBox = new HBox();
         infoBox.setAlignment(Pos.CENTER_LEFT);
-        infoBox.setPadding(new Insets(20, 24, 20, 24));
+        infoBox.setPadding(new Insets(16, 20, 16, 20));
         
-        VBox nBox = new VBox(4);
-        Label nameLabel = new Label(name);
-        nameLabel.getStyleClass().add("headline");
-        nameLabel.setStyle("-fx-text-fill: #DFE2EB; -fx-font-weight: bold; -fx-font-size: 15px; -fx-letter-spacing: 0.05em;");
-        Label handLbl = new Label("");
-        handLbl.setStyle("-fx-text-fill: " + SECONDARY + "; -fx-font-weight: bold; -fx-font-size: 11px;");
-        handRaisedLabels.put(name, handLbl);
-        nBox.getChildren().addAll(nameLabel, handLbl);
+        VBox nBox = new VBox(2);
+        Label nL = new Label(name); nL.setStyle("-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px;");
+        Label sL = new Label("Student Node"); sL.setStyle("-fx-text-fill: rgba(255,255,255,0.4); -fx-font-size: 10px;");
+        nBox.getChildren().addAll(nL, sL);
 
         Region space = new Region(); HBox.setHgrow(space, Priority.ALWAYS);
         Button moreBtn = new Button("⋮");
-        moreBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-size: 20px; -fx-cursor: hand;");
+        moreBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-size: 16px; -fx-cursor: hand;");
         moreBtn.setOnAction(e -> promptCommand(name));
-
         infoBox.getChildren().addAll(nBox, space, moreBtn);
-        StackPane.setAlignment(infoBox, Pos.BOTTOM_CENTER);
 
-        card.getChildren().addAll(imgContainer, infoBox);
+        StackPane.setAlignment(infoBox, Pos.BOTTOM_CENTER);
+        card.getChildren().addAll(imgTop, infoBox);
 
         // Hover events
         card.setOnMouseEntered(e -> {
-            glow.setColor(Color.web("rgba(0,0,0,0.4)")); // Shadow drop
-            card.setStyle("-fx-background-color: rgba(28, 32, 38, 0.6); -fx-translate-y: -5; -fx-border-color: rgba(255,255,255,0.1); -fx-border-radius: 24; -fx-background-radius: 24;");
-            vivid.setBrightness(0.0); // Remove darkened filter
-            FadeTransition ft = new FadeTransition(Duration.millis(300), actionOverlay);
-            ft.setToValue(1.0); ft.play();
+            card.setStyle("-fx-background-color: rgba(28, 32, 38, 0.8); -fx-border-color: rgba(255,255,255,0.1); -fx-background-radius: 20px; -fx-border-radius: 20px; -fx-translate-y: -4;");
+            dim.setBrightness(0);
+            if (!supportOverlay.isVisible()) hoverAction.setOpacity(1.0);
         });
         card.setOnMouseExited(e -> {
-            glow.setColor(Color.TRANSPARENT);
-            card.setStyle("-fx-background-color: rgba(28, 32, 38, 0.4); -fx-translate-y: 0; -fx-border-color: rgba(255,255,255,0.05); -fx-border-radius: 24; -fx-background-radius: 24;");
-            vivid.setBrightness(-0.2); // Restore darkened filter
-            FadeTransition ft = new FadeTransition(Duration.millis(300), actionOverlay);
-            ft.setToValue(0.0); ft.play();
+            card.setStyle("-fx-background-color: " + C_SURFACE_MID + "; -fx-border-color: " + C_BORDER + "; -fx-background-radius: 20px; -fx-border-radius: 20px; -fx-translate-y: 0;");
+            dim.setBrightness(-0.3);
+            hoverAction.setOpacity(0.0);
         });
 
         thumbnailGrid.getChildren().add(card);
         studentCards.put(name, card);
         studentImages.put(name, imgView);
-        
         updateCountLabel();
     }
 
-    private static Button cardActionBtn(String icon, String color, boolean isPrimary) {
-        Button btn = new Button(icon);
-        if (isPrimary) {
-            btn.setStyle("-fx-background-color: linear-gradient(to bottom right, #00dbe9 0%, #00f0ff 100%); -fx-text-fill: #002022; -fx-font-size: 24px; -fx-padding: 12; -fx-background-radius: 50em; -fx-cursor: hand;");
-            btn.setEffect(new DropShadow(15, Color.web(PRIMARY_CONTAINER, 0.4)));
-        } else {
-            btn.setStyle("-fx-background-color: rgba(255,255,255,0.1); -fx-text-fill: " + color + "; -fx-font-size: 20px; -fx-padding: 10; -fx-background-radius: 50em; -fx-cursor: hand;");
-        }
-        btn.setOnMouseEntered(e -> { btn.setScaleX(1.1); btn.setScaleY(1.1); });
-        btn.setOnMouseExited(e -> { btn.setScaleX(1.0); btn.setScaleY(1.0); });
-        return btn;
+    private static Button cardBtn(String ic, String fill) {
+        Button b = new Button(ic);
+        b.setStyle("-fx-background-color: rgba(255,255,255,0.1); -fx-text-fill: " + fill + "; -fx-font-size: 16px; -fx-background-radius: 50em; -fx-padding: 10; -fx-cursor: hand;");
+        b.setOnMouseEntered(e -> { b.setScaleX(1.1); b.setScaleY(1.1); });
+        b.setOnMouseExited(e -> { b.setScaleX(1.0); b.setScaleY(1.0); });
+        return b;
     }
 
     // -----------------------------------------------------------------------
-    // FULLSCREEN FOCUS
+    // BOTTOM SPLIT PANELS
+    // -----------------------------------------------------------------------
+    private static HBox buildBottomPanel() {
+        HBox split = new HBox();
+        split.setPrefHeight(250);
+        split.setStyle("-fx-border-color: " + C_BORDER + "; -fx-border-width: 1 0 0 0;");
+
+        // SECURITY LEDGER (Left)
+        VBox ledger = new VBox(); ledger.setPrefWidth(600);
+        ledger.setStyle("-fx-border-color: " + C_BORDER + "; -fx-border-width: 0 1 0 0; -fx-background-color: rgba(13, 17, 23, 0.5);");
+        
+        HBox lHdr = new HBox(12); lHdr.setPadding(new Insets(16, 32, 16, 32)); lHdr.setAlignment(Pos.CENTER_LEFT);
+        lHdr.setStyle("-fx-border-color: " + C_BORDER + "; -fx-border-width: 0 0 1 0;");
+        Label i1 = new Label("≡ SECURITY LEDGER"); i1.setStyle("-fx-text-fill: white; -fx-font-weight: 900; -fx-font-size: 10px; -fx-letter-spacing: 0.15em;");
+        Region sp = new Region(); HBox.setHgrow(sp, Priority.ALWAYS);
+        HBox liveTag = new HBox(6); liveTag.setAlignment(Pos.CENTER); liveTag.setPadding(new Insets(4,10,4,10)); liveTag.setStyle("-fx-background-color: rgba(0,240,255,0.1); -fx-background-radius: 8px;");
+        Circle ld = new Circle(3, Color.web(C_PRIMARY)); Label ll = new Label("LIVE"); ll.setStyle("-fx-text-fill: " + C_PRIMARY + "; -fx-font-weight: 900; -fx-font-size: 8px; -fx-letter-spacing: 0.1em;");
+        liveTag.getChildren().addAll(ld, ll);
+        lHdr.getChildren().addAll(i1, sp, liveTag);
+
+        activityFeed = new ListView<>();
+        activityFeed.setStyle("-fx-background-color: transparent; -fx-control-inner-background: transparent; -fx-font-family: 'Inter', monospace; -fx-padding: 16;");
+        VBox.setVgrow(activityFeed, Priority.ALWAYS);
+        ledger.getChildren().addAll(lHdr, activityFeed);
+
+        // TERMINAL TABS (Right)
+        VBox term = new VBox();
+        HBox.setHgrow(term, Priority.ALWAYS);
+        term.setStyle("-fx-background-color: rgba(0,0,0,0.2);");
+
+        HBox tHdr = new HBox(0); tHdr.setStyle("-fx-border-color: " + C_BORDER + "; -fx-border-width: 0 0 1 0;");
+        Label tb1 = new Label("TERMINAL"); tb1.setStyle("-fx-text-fill: " + C_PRIMARY + "; -fx-font-weight: 900; -fx-font-size: 10px; -fx-letter-spacing: 0.25em; -fx-padding: 16 32; -fx-border-color: " + C_PRIMARY + "; -fx-border-width: 0 0 2 0; -fx-background-color: rgba(0,240,255,0.02);");
+        Label tb2 = new Label("CHAT"); tb2.setStyle("-fx-text-fill: rgba(255,255,255,0.3); -fx-font-weight: 900; -fx-font-size: 10px; -fx-letter-spacing: 0.25em; -fx-padding: 16 32;");
+        Label tb3 = new Label("AI DIAGNOSTICS"); tb3.setStyle("-fx-text-fill: rgba(255,255,255,0.3); -fx-font-weight: 900; -fx-font-size: 10px; -fx-letter-spacing: 0.25em; -fx-padding: 16 32;");
+        tHdr.getChildren().addAll(tb1, tb2, tb3);
+
+        termOutput = new TextArea();
+        termOutput.setEditable(false);
+        termOutput.setStyle("-fx-background-color: transparent; -fx-control-inner-background: transparent; -fx-font-family: 'Consolas', monospace; -fx-font-size: 11px; -fx-text-fill: rgba(0,240,255,0.6); -fx-padding: 16;");
+        VBox.setVgrow(termOutput, Priority.ALWAYS);
+
+        appendTerminal("root@king_of_lab:~$ monitor --health --detailed\nAnalyzing neural link integrity across segment...\nLatency stable at 14ms mean.\n>>> CLUSTER STATUS: OPTIMAL\n");
+
+        HBox tInp = new HBox(12); tInp.setPadding(new Insets(0, 16, 16, 16)); tInp.setAlignment(Pos.CENTER_LEFT);
+        Label pr = new Label("root@king_of_lab:~$"); pr.setStyle("-fx-text-fill: " + C_SUCCESS + "; -fx-font-family: 'Consolas', monospace; -fx-font-size: 11px;");
+        TextField termF = new TextField(); 
+        termF.setPromptText("broadcast --priority high ...");
+        termF.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-family: 'Consolas', monospace;");
+        HBox.setHgrow(termF, Priority.ALWAYS);
+        termF.setOnAction(e -> {
+            String c = termF.getText().trim();
+            if(!c.isEmpty()) {
+                server.broadcast(pkt(CommandPacket.Type.SHELL, c));
+                appendTerminal("root@king_of_lab:~$ " + c + "\nDistributing encrypted packet to all nodes... [Done]");
+                termF.clear();
+            }
+        });
+        tInp.getChildren().addAll(pr, termF);
+
+        term.getChildren().addAll(tHdr, termOutput, tInp);
+        split.getChildren().addAll(ledger, term);
+        return split;
+    }
+
+
+    // -----------------------------------------------------------------------
+    // FULLSCREEN OVERLAY
     // -----------------------------------------------------------------------
     private static void buildFocusOverlay() {
         focusOverlay = new StackPane();
@@ -670,18 +622,14 @@ public class AdminDashboard {
         focusImgView.fitHeightProperty().bind(focusOverlay.heightProperty().multiply(0.85));
 
         focusOverlay.setFocusTraversable(true);
-        focusOverlay.setOnKeyPressed(e -> {
-            if (e.getCode() == javafx.scene.input.KeyCode.ESCAPE) hideFocusView();
-        });
+        focusOverlay.setOnKeyPressed(e -> { if (e.getCode() == javafx.scene.input.KeyCode.ESCAPE) hideFocusView(); });
 
         Button closeBtn = new Button("✕ EXIT FOCUS");
-        closeBtn.getStyleClass().add("btn-glass");
-        closeBtn.setStyle("-fx-background-color: rgba(255,0,0,0.2); -fx-text-fill: " + DANGER_COLOR + "; -fx-padding: 12 32; -fx-font-size: 14px;");
+        closeBtn.setStyle("-fx-background-color: rgba(255,0,0,0.2); -fx-text-fill: " + C_DANGER + "; -fx-padding: 12 32; -fx-font-weight: bold; -fx-background-radius: 12px; -fx-cursor: hand;");
         closeBtn.setOnAction(e -> hideFocusView());
         
         StackPane.setAlignment(closeBtn, Pos.BOTTOM_CENTER);
         StackPane.setMargin(closeBtn, new Insets(0, 0, 40, 0));
-
         focusOverlay.getChildren().addAll(focusImgView, closeBtn);
     }
 
@@ -691,14 +639,11 @@ public class AdminDashboard {
         focusOverlay.setVisible(true);
         focusOverlay.requestFocus();
     }
+    private static void hideFocusView() { currentlyFocusedStudent = null; focusOverlay.setVisible(false); }
 
-    private static void hideFocusView() {
-        currentlyFocusedStudent = null;
-        focusOverlay.setVisible(false);
-    }
 
     // -----------------------------------------------------------------------
-    // CORE LOGIC PASSTHROUGHS
+    // DATA BINDINGS & INTERNAL LOGIC
     // -----------------------------------------------------------------------
     private static void updateStudentScreenBinary(String name, Image image) {
         try {
@@ -706,7 +651,7 @@ public class AdminDashboard {
             if (studentImages.containsKey(name)) {
                 long now = System.currentTimeMillis();
                 long last = lastGridUpdate.getOrDefault(name, 0L);
-                if (now - last > 120) { studentImages.get(name).setImage(image); lastGridUpdate.put(name, now); }
+                if (now - last > 100) { studentImages.get(name).setImage(image); lastGridUpdate.put(name, now); }
             } else {
                 addStudentCard(name, image);
                 lastGridUpdate.put(name, System.currentTimeMillis());
@@ -716,173 +661,87 @@ public class AdminDashboard {
     }
 
     private static void updateStudentScreen(String name, String base64) {
-        try {
-            byte[] bytes = Base64.getDecoder().decode(base64);
-            Image image  = new Image(new ByteArrayInputStream(bytes));
-            updateStudentScreenBinary(name, image);
-        } catch (Exception e) {}
+        try { updateStudentScreenBinary(name, new Image(new ByteArrayInputStream(Base64.getDecoder().decode(base64)))); } catch (Exception e) {}
     }
 
     private static void removeStudentCard(String name) {
         StackPane card = studentCards.remove(name);
-        if (card != null) {
-            FadeTransition ft = new FadeTransition(Duration.millis(280), card);
-            ft.setToValue(0);
-            ft.setOnFinished(e -> thumbnailGrid.getChildren().remove(card));
-            ft.play();
-        }
+        if (card != null) thumbnailGrid.getChildren().remove(card);
         studentImages.remove(name); handRaisedLabels.remove(name); statusDots.remove(name); lastGridUpdate.remove(name);
     }
 
     private static void updateCountLabel() {
         int n = studentCards.size();
-        if (connectedLabel != null) connectedLabel.setText(n + " CONNECTED");
+        if (connectedLabel != null) connectedLabel.setText(n + "\nCONNECTED");
     }
 
     private static void updateHandRaised(String student, boolean up) {
-        Label lbl = handRaisedLabels.get(student);
-        if (lbl != null) lbl.setText(up ? "✋ Support Needed" : "");
-        if (up) appendActivity("INCIDENT", "High priority help request from " + student, SECONDARY);
+        StackPane card = studentCards.get(student);
+        if(card != null && card.getChildren().get(0) instanceof StackPane) {
+            StackPane imgTop = (StackPane) card.getChildren().get(0);
+            if(imgTop.getChildren().size() > 1 && imgTop.getChildren().get(1) instanceof VBox) {
+                imgTop.getChildren().get(1).setVisible(up);
+            }
+        }
+        if (up) appendActivity("INCIDENT", "Support requested at " + student, C_SECONDARY);
     }
 
     private static void startSessionTimer() {
         Timeline t = new Timeline(new KeyFrame(Duration.seconds(1), e -> {
             long sec = (System.currentTimeMillis() - startTime) / 1000;
-            long m = (sec / 60) % 60;
-            long h = (sec / 3600);
-            if(sessionTimerLabel != null) sessionTimerLabel.setText(String.format("Session: %02dh %02dm", h, m));
+            if(sessionInfoLabel != null) sessionInfoLabel.setText(String.format("Session: %02dh %02dm", (sec / 3600), ((sec / 60) % 60)));
         }));
         t.setCycleCount(Animation.INDEFINITE); t.play();
     }
 
-    private static void appendActivity(String type, String msg, String color) {
+    private static void appendActivity(String type, String msg, String colorHex) {
         String time = new java.text.SimpleDateFormat("HH:mm:ss").format(new Date());
         Platform.runLater(() -> {
-            activityFeed.getItems().add(time + "   [" + type + "]  " + msg);
+            // Using standard strings parsed via javaFX CSS node rendering trick if needed, or plain text
+            String log = String.format("%s   [%s] %s", time, type, msg);
+            activityFeed.getItems().add(log);
             activityFeed.scrollTo(activityFeed.getItems().size() - 1);
         });
     }
 
     private static void appendTerminal(String msg) {
-        if (termOutput != null) { termOutput.appendText(msg + "\n"); }
+        if (termOutput != null) termOutput.appendText(msg);
     }
 
-    private static void activateStandardMode() {
-        isUltraActive = false;
-        server.broadcast(pkt(CommandPacket.Type.STREAM_MODE, "LEGACY_CPU"));
-        appendActivity("SYSTEM", "Mode -> AWT Render Engine", SUCCESS_COLOR);
-    }
-
-    private static void activateUltraMode() {
-        isUltraActive = true;
-        server.broadcast(pkt(CommandPacket.Type.STREAM_MODE, "ULTRA_WEBRTC"));
-        appendActivity("SYSTEM", "Mode -> DXGI Hardware Pipeline", PRIMARY_CONTAINER);
-    }
-
-    private static void toggleScreenShare() {
-        isSharingScreen = !isSharingScreen;
-        if (isSharingScreen) {
-            ScreenCapture.startAsyncCapture();
-            Thread t = new Thread(() -> {
-                while (isSharingScreen) {
-                    try {
-                        String frame = ScreenCapture.getLatestFrame();
-                        if (frame != null) server.broadcast(pkt(CommandPacket.Type.ADMIN_SCREEN, frame));
-                        Thread.sleep(100);
-                    } catch (Exception e) { break; }
-                }
-            });
-            t.setDaemon(true); t.start();
-            appendActivity("SYSTEM", "Admin screen share ENABLED", WARNING_COLOR);
-        } else {
-            ScreenCapture.stopAsyncCapture();
-            appendActivity("SYSTEM", "Admin screen share DISABLED", SUCCESS_COLOR);
-        }
-    }
-
-    private static void toggleAi(String adminName) {
+    private static void toggleAi(String adm) {
         Config.aiEnabled = !Config.aiEnabled;
-        String payload = Config.aiEnabled ? "ENABLE" : "DISABLE";
-        server.broadcast(pkt(CommandPacket.Type.AI_TOGGLE, payload));
-        if(aiStatusLabel != null) aiStatusLabel.setText("AI: " + (Config.aiEnabled ? "ON" : "OFF"));
-        if(aiToggleBtn != null) aiToggleBtn.getStyleClass().add(Config.aiEnabled ? "active" : "inactive");
-        appendActivity("SYSTEM", "AI Assistance " + payload + "D", PRIMARY_CONTAINER);
+        server.broadcast(pkt(CommandPacket.Type.AI_TOGGLE, Config.aiEnabled ? "ENABLE" : "DISABLE"));
+        if(aiStatusLabel != null) aiStatusLabel.setText("AI:\n" + (Config.aiEnabled ? "ON" : "OFF"));
     }
-
-    private static void promptMessage(String name) {
-        TextInputDialog d = new TextInputDialog(); d.setHeaderText("Message to " + name);
-        d.showAndWait().ifPresent(msg -> {
-            if (!msg.trim().isEmpty()) {
-                server.sendToClient(name, pkt(CommandPacket.Type.MSG, msg));
-                appendActivity("MSG", "Sent private message to " + name, SUCCESS_COLOR);
-            }
-        });
-    }
-
-    private static void promptCommand(String name) {
-        TextInputDialog d = new TextInputDialog(); d.setHeaderText("Command for " + name);
-        d.showAndWait().ifPresent(cmd -> {
-            if (!cmd.trim().isEmpty()) {
-                server.sendToClient(name, pkt(CommandPacket.Type.SHELL, cmd));
-                appendActivity("SHELL", "Executed custom shell on " + name, SUCCESS_COLOR);
-            }
-        });
-    }
-
 
     private static void promptGlobalMessage() {
         TextInputDialog d = new TextInputDialog(); d.setHeaderText("Global Broadcast Message");
         d.showAndWait().ifPresent(msg -> {
             if (!msg.trim().isEmpty()) {
                 server.broadcast(pkt(CommandPacket.Type.MSG, msg));
-                appendActivity("MSG", "Global broadcast sent", PRIMARY_CONTAINER);
+                appendActivity("MSG", "Broadcast transmitted globally", C_PRIMARY);
             }
+        });
+    }
+
+    private static void promptMessage(String name) {
+        TextInputDialog d = new TextInputDialog(); d.setHeaderText("Message to " + name);
+        d.showAndWait().ifPresent(msg -> {
+            if (!msg.trim().isEmpty()) { server.sendToClient(name, pkt(CommandPacket.Type.MSG, msg)); appendActivity("MSG", "Private to " + name, C_SUCCESS); }
+        });
+    }
+
+    private static void promptCommand(String name) {
+        TextInputDialog d = new TextInputDialog(); d.setHeaderText("Shell Command for " + name);
+        d.showAndWait().ifPresent(c -> {
+            if (!c.trim().isEmpty()) { server.sendToClient(name, pkt(CommandPacket.Type.SHELL, c)); appendActivity("SHELL", "Executed on " + name, C_SUCCESS); }
         });
     }
 
     private static void openUrlOnAll() {
-        TextInputDialog d = new TextInputDialog("https://"); d.setHeaderText("Broadcast URL to all nodes");
-        d.showAndWait().ifPresent(url -> {
-            if (!url.trim().isEmpty()) {
-                server.broadcast(pkt(CommandPacket.Type.OPEN_URL, url));
-                appendActivity("NET", "Opened URL on all nodes: " + url, SUCCESS_COLOR);
-            }
-        });
+        TextInputDialog d = new TextInputDialog("https://"); d.setHeaderText("Broadcast URL");
+        d.showAndWait().ifPresent(url -> { if(!url.trim().isEmpty()) server.broadcast(pkt(CommandPacket.Type.OPEN_URL, url)); });
     }
 
-    private static void sendFilesToStudents(Stage stage) {
-        FileChooser fc = new FileChooser();
-        List<File> files = fc.showOpenMultipleDialog(stage);
-        if (files == null || files.isEmpty()) return;
-        for (File f : files) {
-            try {
-                byte[] bytes = java.nio.file.Files.readAllBytes(f.toPath());
-                String b64 = Base64.getEncoder().encodeToString(bytes);
-                server.broadcast(pkt(CommandPacket.Type.FILE_DATA, f.getName() + "|" + b64));
-                appendActivity("FILE", "Sent " + f.getName() + " to cluster", SUCCESS_COLOR);
-            } catch (Exception e) {}
-        }
-    }
-
-    private static void captureAllScreenshots(Stage stage) {
-        File dir = new File(System.getProperty("user.home"), "KingLab Screenshots"); dir.mkdirs();
-        String ts = new java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss").format(new Date());
-        for (Map.Entry<String, ImageView> entry : studentImages.entrySet()) {
-            Image img = entry.getValue().getImage();
-            if (img != null) {
-                try {
-                    java.awt.image.BufferedImage bi = new java.awt.image.BufferedImage((int)img.getWidth(), (int)img.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
-                    javafx.scene.image.PixelReader pr = img.getPixelReader();
-                    for (int y=0; y<(int)img.getHeight(); y++) for (int x=0; x<(int)img.getWidth(); x++) bi.setRGB(x,y,pr.getArgb(x,y));
-                    File out = new File(dir, entry.getKey() + "_" + ts + ".png");
-                    javax.imageio.ImageIO.write(bi, "png", out);
-                } catch (Exception e) {}
-            }
-        }
-        appendActivity("SYSTEM", "Saved cluster snapshots to disk", SUCCESS_COLOR);
-    }
-    
-    private static CommandPacket pkt(CommandPacket.Type type, String payload) {
-        return new CommandPacket(type, "ADMIN", payload);
-    }
+    private static CommandPacket pkt(CommandPacket.Type t, String p) { return new CommandPacket(t, "ADMIN", p); }
 }
