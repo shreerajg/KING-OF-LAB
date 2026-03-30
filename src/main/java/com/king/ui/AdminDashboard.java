@@ -18,6 +18,8 @@ import javafx.scene.paint.Color;
 import javafx.scene.paint.LinearGradient;
 import javafx.scene.paint.Stop;
 import javafx.scene.paint.CycleMethod;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
@@ -28,9 +30,16 @@ import java.io.*;
 import java.util.*;
 
 /**
- * King of Lab — Admin Dashboard v5 (Stitch Hologram Design - Pure Java Edition).
- * UI precisely rebuilt to match the "Command Sentinel" tactical hologram screenshot.
+ * King of Lab — Admin Dashboard v6 (Stitch Hologram Design - Tactical Hologram).
+ * UI rebuilt to match the "Command Sentinel" tactical hologram design spec.
  * Uses 100% inline CSS styling for compatibility with the native batch build process.
+ * 
+ * Design System: The Command Sentinel - "Tactical Hologram"
+ * - Glassmorphism with 60% opacity + backdrop blur effect
+ * - No 1px solid borders - use background shifts
+ * - Ambient glow with primary_container at 5% opacity
+ * - Pulse Monitor sparkline for real-time data flow
+ * - Space Grotesk (display) + Inter (body) typography
  */
 public class AdminDashboard {
 
@@ -41,11 +50,15 @@ public class AdminDashboard {
     private static FlowPane         thumbnailGrid;
     private static ListView<String> activityFeed;
     private static TextArea         termOutput;
+    private static Canvas           pulseMonitorCanvas;
+    private static double[]         pulseData = new double[60];
+    private static int              pulseIndex = 0;
     
     // Status Indicators
     private static Label connectedLabel;
     private static Label aiStatusLabel;
     private static Label sessionInfoLabel;
+    private static Label healthLabel;
 
     // Focus & Special Actions
     private static StackPane focusOverlay;
@@ -69,21 +82,27 @@ public class AdminDashboard {
     private static boolean isSharingScreen = false;
     private static long startTime = System.currentTimeMillis();
 
-    // Exact HEX Map mapping to generic JavaFX color strings
-    public static final String C_SURFACE     = "#10141a";
-    public static final String C_SURFACE_LOW = "#181c22";
-    public static final String C_SURFACE_MID = "#1c2026";
-    public static final String C_SURFACE_HI  = "#262a31";
-    public static final String C_PRIMARY     = "#00f0ff";
-    public static final String C_PRIMARY_DIM = "#00dbe9";
-    public static final String C_SECONDARY   = "#dcb8ff";
-    public static final String C_PURPLE_GLOW = "#7701d0";
-    public static final String C_SUCCESS     = "#7af19c";
-    public static final String C_WARNING     = "#ffc857";
-    public static final String C_DANGER      = "#ffb4ab";
-    public static final String C_TEXT_MAIN   = "#dfe2eb";
-    public static final String C_TEXT_MUTED  = "#849495";
-    public static final String C_BORDER      = "rgba(255,255,255,0.05)";
+    // Design System Colors - The Command Sentinel Palette
+    public static final String C_SURFACE              = "#10141a";      // Base Layer
+    public static final String C_SURFACE_CONTAINER    = "#1c2026";      // Secondary Tier
+    public static final String C_SURFACE_HIGH         = "#262a31";      // Action Tier
+    public static final String C_SURFACE_HIGHEST      = "#31353c";      // Highlight Tier
+    public static final String C_SURFACE_LOWEST       = "#0a0e14";      // Glass base
+    public static final String C_PRIMARY             = "#00f0ff";      // Cyan - standard ops
+    public static final String C_PRIMARY_DIM          = "#00dbe9";
+    public static final String C_PRIMARY_GLASS        = "#dbfcff";      // Inner glow
+    public static final String C_SECONDARY            = "#dcb8ff";      // Purple - AI/Advanced
+    public static final String C_SECONDARY_CONTAINER  = "#7701d0";
+    public static final String C_SUCCESS              = "#7af19c";
+    public static final String C_WARNING              = "#ffc857";
+    public static final String C_DANGER               = "#ffb4ab";
+    public static final String C_ERROR_CONTAINER      = "#ffdad9";
+    public static final String C_TERTIARY_CONTAINER   = "#aaf0ca";
+    public static final String C_TEXT_MAIN            = "#dfe2eb";      // Never use #FFFFFF
+    public static final String C_TEXT_MUTED           = "#849495";
+    public static final String C_ON_PRIMARY_FIXED    = "#002022";
+    public static final String C_BORDER               = "rgba(255,255,255,0.05)";
+    public static final String C_OUTLINE_VARIANT      = "rgba(59,73,75,0.15)"; // Ghost border fallback
 
     public static void show(Stage stage, User user) {
         if (server == null) {
@@ -160,6 +179,47 @@ public class AdminDashboard {
         stage.show();
         
         startSessionTimer();
+        startPulseMonitor();
+    }
+
+    private static void startPulseMonitor() {
+        Timeline t = new Timeline(new KeyFrame(Duration.millis(100), e -> {
+            double val = 0.3 + Math.random() * 0.4;
+            pulseData[pulseIndex] = val;
+            pulseIndex = (pulseIndex + 1) % pulseData.length;
+            if (pulseMonitorCanvas != null) drawPulseMonitor();
+        }));
+        t.setCycleCount(Animation.INDEFINITE); t.play();
+    }
+
+    private static void drawPulseMonitor() {
+        if (pulseMonitorCanvas == null) return;
+        GraphicsContext gc = pulseMonitorCanvas.getGraphicsContext2D();
+        double w = pulseMonitorCanvas.getWidth();
+        double h = pulseMonitorCanvas.getHeight();
+        gc.clearRect(0, 0, w, h);
+        gc.setFill(Color.web(C_PRIMARY, 0.1));
+        gc.beginPath();
+        gc.moveTo(0, h);
+        for (int i = 0; i < pulseData.length; i++) {
+            int idx = (pulseIndex + i) % pulseData.length;
+            double x = (double) i / pulseData.length * w;
+            double y = h - pulseData[idx] * h;
+            gc.lineTo(x, y);
+        }
+        gc.lineTo(w, h);
+        gc.closePath();
+        gc.fill();
+        gc.setStroke(Color.web(C_PRIMARY_GLASS));
+        gc.setLineWidth(1.5);
+        gc.beginPath();
+        for (int i = 0; i < pulseData.length; i++) {
+            int idx = (pulseIndex + i) % pulseData.length;
+            double x = (double) i / pulseData.length * w;
+            double y = h - pulseData[idx] * h;
+            if (i == 0) gc.moveTo(x, y); else gc.lineTo(x, y);
+        }
+        gc.stroke();
     }
 
     // -----------------------------------------------------------------------
@@ -215,7 +275,17 @@ public class AdminDashboard {
 
         healthPill.getChildren().addAll(bxConn, buildVDivider(), bxHealth, buildVDivider(), bxAi);
 
-        // Profile Section
+        // Profile Section with Pulse Monitor
+        HBox profileSection = new HBox(16);
+        profileSection.setAlignment(Pos.CENTER);
+
+        pulseMonitorCanvas = new Canvas(80, 24);
+        pulseMonitorCanvas.setStyle("-fx-background-color: transparent;");
+        StackPane pulseContainer = new StackPane(pulseMonitorCanvas);
+        pulseContainer.setStyle("-fx-background-color: rgba(0,240,255,0.05); -fx-background-radius: 8px; -fx-border-color: rgba(0,240,255,0.1); -fx-border-radius: 8px; -fx-padding: 4;");
+        StackPane.setAlignment(pulseContainer, Pos.CENTER_LEFT);
+        StackPane.setMargin(pulseContainer, new Insets(0, 16, 0, 0));
+
         Button bBell = new Button("🔔"); bBell.setStyle("-fx-background-color: transparent; -fx-text-fill: rgba(223,226,235,0.6); -fx-cursor: hand;");
         Button bGear = new Button("⚙"); bGear.setStyle("-fx-background-color: transparent; -fx-text-fill: rgba(223,226,235,0.6); -fx-cursor: hand;");
 
@@ -232,7 +302,9 @@ public class AdminDashboard {
         Label avT = new Label("👤"); avT.setStyle("-fx-text-fill: white; -fx-font-size: 18px;");
         avatarPane.getChildren().addAll(avBg, avT);
 
-        topNav.getChildren().addAll(lBox, links, spacer, healthPill, bBell, bGear, adminTxt, avatarPane);
+        profileSection.getChildren().addAll(pulseContainer, bBell, bGear, adminTxt, avatarPane);
+
+        topNav.getChildren().addAll(lBox, links, spacer, healthPill, profileSection);
         return topNav;
     }
 
@@ -442,7 +514,7 @@ public class AdminDashboard {
 
         StackPane card = new StackPane();
         card.setPrefSize(270, 240);
-        card.setStyle("-fx-background-color: " + C_SURFACE_MID + "; -fx-border-color: " + C_BORDER + "; -fx-background-radius: 20px; -fx-border-radius: 20px;");
+        card.setStyle("-fx-background-color: " + C_SURFACE_CONTAINER + "; -fx-border-color: " + C_BORDER + "; -fx-background-radius: 20px; -fx-border-radius: 20px;");
         card.setEffect(new DropShadow(BlurType.GAUSSIAN, Color.web("#000000", 0.4), 15, 0, 0, 8));
 
         // Top Half: image
@@ -523,7 +595,7 @@ public class AdminDashboard {
             if (!supportOverlay.isVisible()) hoverAction.setOpacity(1.0);
         });
         card.setOnMouseExited(e -> {
-            card.setStyle("-fx-background-color: " + C_SURFACE_MID + "; -fx-border-color: " + C_BORDER + "; -fx-background-radius: 20px; -fx-border-radius: 20px; -fx-translate-y: 0;");
+            card.setStyle("-fx-background-color: " + C_SURFACE_CONTAINER + "; -fx-border-color: " + C_BORDER + "; -fx-background-radius: 20px; -fx-border-radius: 20px; -fx-translate-y: 0;");
             dim.setBrightness(-0.3);
             hoverAction.setOpacity(0.0);
         });
