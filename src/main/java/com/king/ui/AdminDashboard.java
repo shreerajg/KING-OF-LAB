@@ -82,27 +82,27 @@ public class AdminDashboard {
     private static boolean isSharingScreen = false;
     private static long startTime = System.currentTimeMillis();
 
-    // Design System Colors - The Command Sentinel Palette
-    public static final String C_SURFACE              = "#10141a";      // Base Layer
-    public static final String C_SURFACE_CONTAINER    = "#1c2026";      // Secondary Tier
-    public static final String C_SURFACE_HIGH         = "#262a31";      // Action Tier
-    public static final String C_SURFACE_HIGHEST      = "#31353c";      // Highlight Tier
-    public static final String C_SURFACE_LOWEST       = "#0a0e14";      // Glass base
-    public static final String C_PRIMARY             = "#00f0ff";      // Cyan - standard ops
+    // Design System Colors - The Command Sentinel Palette (delegated to StitchStyles)
+    public static final String C_SURFACE              = StitchStyles.C_SURFACE;
+    public static final String C_SURFACE_CONTAINER    = StitchStyles.C_SURFACE_CONTAINER;
+    public static final String C_SURFACE_HIGH         = StitchStyles.C_SURFACE_HIGH;
+    public static final String C_SURFACE_HIGHEST      = StitchStyles.C_SURFACE_HIGHEST;
+    public static final String C_SURFACE_LOWEST       = StitchStyles.C_SURFACE_LOWEST;
+    public static final String C_PRIMARY              = StitchStyles.C_PRIMARY;
     public static final String C_PRIMARY_DIM          = "#00dbe9";
-    public static final String C_PRIMARY_GLASS        = "#dbfcff";      // Inner glow
-    public static final String C_SECONDARY            = "#dcb8ff";      // Purple - AI/Advanced
-    public static final String C_SECONDARY_CONTAINER  = "#7701d0";
+    public static final String C_PRIMARY_GLASS        = StitchStyles.C_PRIMARY_GLASS;
+    public static final String C_SECONDARY            = "#dcb8ff";
+    public static final String C_SECONDARY_CONTAINER  = StitchStyles.C_SECONDARY_CONTAINER;
     public static final String C_SUCCESS              = "#7af19c";
     public static final String C_WARNING              = "#ffc857";
     public static final String C_DANGER               = "#ffb4ab";
     public static final String C_ERROR_CONTAINER      = "#ffdad9";
     public static final String C_TERTIARY_CONTAINER   = "#aaf0ca";
-    public static final String C_TEXT_MAIN            = "#dfe2eb";      // Never use #FFFFFF
-    public static final String C_TEXT_MUTED           = "#849495";
-    public static final String C_ON_PRIMARY_FIXED    = "#002022";
+    public static final String C_TEXT_MAIN            = StitchStyles.C_TEXT_MAIN;
+    public static final String C_TEXT_MUTED           = StitchStyles.C_TEXT_MUTED;
+    public static final String C_ON_PRIMARY_FIXED     = StitchStyles.C_ON_PRIMARY_FIXED;
     public static final String C_BORDER               = "rgba(255,255,255,0.05)";
-    public static final String C_OUTLINE_VARIANT      = "rgba(59,73,75,0.15)"; // Ghost border fallback
+    public static final String C_OUTLINE_VARIANT      = "rgba(59,73,75,0.15)";
 
     public static void show(Stage stage, User user) {
         if (server == null) {
@@ -143,7 +143,7 @@ public class AdminDashboard {
 
         // Base App Container
         BorderPane root = new BorderPane();
-        root.setStyle("-fx-background-color: " + C_SURFACE + "; -fx-font-family: 'Segoe UI', 'Inter', sans-serif;");
+        root.setStyle(StitchStyles.appRoot());
 
         // UI Zones
         root.setTop(buildTopNavBar(user));
@@ -230,7 +230,8 @@ public class AdminDashboard {
         topNav.setPrefHeight(64);
         topNav.setAlignment(Pos.CENTER_LEFT);
         topNav.setPadding(new Insets(0, 32, 0, 32));
-        topNav.setStyle("-fx-background-color: rgba(10, 14, 20, 0.8); -fx-border-color: " + C_BORDER + "; -fx-border-width: 0 0 1 0;");
+        // "No-Line" rule: avoid divider borders; use tonal shift instead.
+        topNav.setStyle("-fx-background-color: rgba(10, 14, 20, 0.82);");
 
         // Logo
         VBox lBox = new VBox(-4);
@@ -255,7 +256,10 @@ public class AdminDashboard {
         HBox healthPill = new HBox(16);
         healthPill.setAlignment(Pos.CENTER);
         healthPill.setPadding(new Insets(8, 20, 8, 20));
-        healthPill.setStyle("-fx-background-color: rgba(24, 28, 34, 0.5); -fx-background-radius: 20px; -fx-border-color: rgba(255,255,255,0.05); -fx-border-radius: 20px;");
+        healthPill.setStyle(
+            StitchStyles.glassPanel(0.55, 22) +
+            "-fx-padding: 8 20 8 20;"
+        );
         
         Circle dot = new Circle(3.5, Color.web(C_SUCCESS));
         dot.setEffect(new DropShadow(8, Color.web(C_SUCCESS, 0.8)));
@@ -311,7 +315,8 @@ public class AdminDashboard {
     private static Region buildVDivider() {
         Region r = new Region();
         r.setPrefWidth(1); r.setPrefHeight(20);
-        r.setStyle("-fx-background-color: rgba(255,255,255,0.1);");
+        // Softer "ghost divider" instead of hard line.
+        r.setStyle("-fx-background-color: rgba(223,226,235,0.08);");
         return r;
     }
 
@@ -321,13 +326,13 @@ public class AdminDashboard {
     private static VBox buildSideNavBar(User user, Stage stage) {
         VBox side = new VBox(0);
         side.setPrefWidth(256);
-        side.setStyle("-fx-background-color: #0b0f14; -fx-border-color: " + C_BORDER + "; -fx-border-width: 0 1 0 0;");
+        side.setStyle("-fx-background-color: #0b0f14;");
         
         // Sentinel Overlay Badge
         HBox badge = new HBox(12);
         badge.setAlignment(Pos.CENTER_LEFT);
         badge.setPadding(new Insets(16));
-        badge.setStyle("-fx-background-color: rgba(28, 32, 38, 0.4); -fx-border-color: " + C_BORDER + "; -fx-border-radius: 12px; -fx-background-radius: 12px;");
+        badge.setStyle(StitchStyles.glassPanel(0.55, 14));
         VBox.setMargin(badge, new Insets(30, 24, 40, 24));
         
         StackPane shieldBox = new StackPane();
@@ -365,15 +370,16 @@ public class AdminDashboard {
         // Bottom Broadcast
         VBox bottomActions = new VBox(20);
         bottomActions.setPadding(new Insets(32, 24, 32, 24));
-        bottomActions.setStyle("-fx-border-color: " + C_BORDER + "; -fx-border-width: 1 0 0 0;");
+        bottomActions.setStyle("-fx-background-color: rgba(0,0,0,0.08);");
         
         Button broadcastBtn = new Button("BROADCAST MESSAGE");
         broadcastBtn.setMaxWidth(Double.MAX_VALUE);
         broadcastBtn.setPadding(new Insets(16, 0, 16, 0));
         broadcastBtn.setStyle(
-            "-fx-background-color: linear-gradient(to bottom right, #00dbe9 0%, #00f0ff 100%);" +
-            "-fx-text-fill: #002022; -fx-font-weight: 900; -fx-background-radius: 12px; -fx-cursor: hand;" +
-            "-fx-font-size: 11px; -fx-letter-spacing: 0.1em; -fx-effect: dropshadow(gaussian, rgba(0, 240, 255, 0.25), 20, 0, 0, 5);"
+            StitchStyles.gradientPrimaryCta(12) +
+            "-fx-font-size: 11px;" +
+            "-fx-padding: 16 0 16 0;" +
+            "-fx-effect: dropshadow(gaussian, rgba(0, 240, 255, 0.22), 26, 0, 0, 6);"
         );
         broadcastBtn.setOnAction(e -> promptGlobalMessage());
 
@@ -419,12 +425,13 @@ public class AdminDashboard {
         HBox ribbon = new HBox(40);
         ribbon.setAlignment(Pos.CENTER_LEFT);
         ribbon.setPadding(new Insets(24, 40, 24, 40));
-        ribbon.setStyle("-fx-background-color: rgba(255,255,255,0.01); -fx-border-color: " + C_BORDER + "; -fx-border-width: 0 0 1 0;");
+        // No-line rule: remove hard divider border; keep an ultra-subtle tonal band.
+        ribbon.setStyle("-fx-background-color: rgba(255,255,255,0.015);");
 
         // Ribbon Block 1: Class Access
         VBox bClass = new VBox(12);
         Label lClass = new Label("CLASS ACCESS"); lClass.setStyle("-fx-text-fill: rgba(223,226,235,0.4); -fx-font-size: 9px; -fx-font-weight: 900; -fx-letter-spacing: 0.25em;");
-        HBox hcClass = new HBox(0); hcClass.setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-border-color: rgba(255,255,255,0.05); -fx-border-radius: 12px; -fx-background-radius: 12px; -fx-padding: 4;");
+        HBox hcClass = new HBox(0); hcClass.setStyle(StitchStyles.glassPanel(0.45, 12) + "-fx-padding: 4;");
         Button lockBtn = ribbonPillBtn("🔒 Lock", true); lockBtn.setOnAction(e -> server.broadcast(pkt(CommandPacket.Type.LOCK, "{}")));
         Button focusBtn = ribbonPillBtn("🎯 Focus", false); focusBtn.setOnAction(e -> server.broadcast(pkt(CommandPacket.Type.UNLOCK, "{}")));
         hcClass.getChildren().addAll(lockBtn, focusBtn);
@@ -433,7 +440,7 @@ public class AdminDashboard {
         // Ribbon Block 2: Connectivity
         VBox bConn = new VBox(12);
         Label lConn = new Label("CONNECTIVITY"); lConn.setStyle("-fx-text-fill: rgba(223,226,235,0.4); -fx-font-size: 9px; -fx-font-weight: 900; -fx-letter-spacing: 0.25em;");
-        HBox hcConn = new HBox(0); hcConn.setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-border-color: rgba(255,255,255,0.05); -fx-border-radius: 12px; -fx-background-radius: 12px; -fx-padding: 4;");
+        HBox hcConn = new HBox(0); hcConn.setStyle(StitchStyles.glassPanel(0.45, 12) + "-fx-padding: 4;");
         Button blockBtn = ribbonPillBtn("🚫 Block", false); blockBtn.setOnAction(e -> openUrlOnAll());
         Button allowBtn = ribbonPillBtn("✅ Allow", false); allowBtn.setStyle(allowBtn.getStyle().replace("transparent", "rgba(0,240,255,0.1)").replace(C_TEXT_MUTED, C_PRIMARY));
         hcConn.getChildren().addAll(blockBtn, allowBtn);
@@ -456,7 +463,15 @@ public class AdminDashboard {
         StackPane srchPane = new StackPane();
         TextField srchFld = new TextField(); 
         srchFld.setPromptText("Enter workstation ID...");
-        srchFld.setStyle("-fx-background-color: rgba(10,14,20,0.5); -fx-border-color: rgba(255,255,255,0.05); -fx-border-radius: 12px; -fx-background-radius: 12px; -fx-text-fill: white; -fx-pref-width: 200; -fx-padding: 10 16; -fx-font-size: 11px;");
+        srchFld.setStyle(
+            "-fx-background-color: rgba(10,14,20,0.55);" +
+            "-fx-background-radius: 12px;" +
+            "-fx-text-fill: " + C_TEXT_MAIN + ";" +
+            "-fx-prompt-text-fill: rgba(223,226,235,0.28);" +
+            "-fx-pref-width: 220;" +
+            "-fx-padding: 10 16;" +
+            "-fx-font-size: 11px;"
+        );
         Label mag = new Label("🔍"); mag.setStyle("-fx-text-fill: rgba(223,226,235,0.2);");
         StackPane.setAlignment(mag, Pos.CENTER_RIGHT); StackPane.setMargin(mag, new Insets(0,16,0,0));
         srchPane.getChildren().addAll(srchFld, mag);
@@ -502,7 +517,7 @@ public class AdminDashboard {
     private static Region buildRibbonDiv() {
         Region r = new Region();
         r.setPrefWidth(1); r.setPrefHeight(40);
-        r.setStyle("-fx-background-color: rgba(255,255,255,0.05);");
+        r.setStyle("-fx-background-color: rgba(223,226,235,0.06);");
         return r;
     }
 
@@ -514,7 +529,11 @@ public class AdminDashboard {
 
         StackPane card = new StackPane();
         card.setPrefSize(270, 240);
-        card.setStyle("-fx-background-color: " + C_SURFACE_CONTAINER + "; -fx-border-color: " + C_BORDER + "; -fx-background-radius: 20px; -fx-border-radius: 20px;");
+        // Card becomes an "Action Tier" glass panel rather than a bordered tile.
+        card.setStyle(
+            "-fx-background-color: rgba(28,32,38,0.82);" +
+            "-fx-background-radius: 20px;"
+        );
         card.setEffect(new DropShadow(BlurType.GAUSSIAN, Color.web("#000000", 0.4), 15, 0, 0, 8));
 
         // Top Half: image
@@ -590,12 +609,20 @@ public class AdminDashboard {
 
         // Hover events
         card.setOnMouseEntered(e -> {
-            card.setStyle("-fx-background-color: rgba(28, 32, 38, 0.8); -fx-border-color: rgba(255,255,255,0.1); -fx-background-radius: 20px; -fx-border-radius: 20px; -fx-translate-y: -4;");
+            card.setStyle(
+                "-fx-background-color: rgba(28, 32, 38, 0.88);" +
+                "-fx-background-radius: 20px;" +
+                "-fx-translate-y: -4;"
+            );
             dim.setBrightness(0);
             if (!supportOverlay.isVisible()) hoverAction.setOpacity(1.0);
         });
         card.setOnMouseExited(e -> {
-            card.setStyle("-fx-background-color: " + C_SURFACE_CONTAINER + "; -fx-border-color: " + C_BORDER + "; -fx-background-radius: 20px; -fx-border-radius: 20px; -fx-translate-y: 0;");
+            card.setStyle(
+                "-fx-background-color: rgba(28,32,38,0.82);" +
+                "-fx-background-radius: 20px;" +
+                "-fx-translate-y: 0;"
+            );
             dim.setBrightness(-0.3);
             hoverAction.setOpacity(0.0);
         });
@@ -620,14 +647,14 @@ public class AdminDashboard {
     private static HBox buildBottomPanel() {
         HBox split = new HBox();
         split.setPrefHeight(250);
-        split.setStyle("-fx-border-color: " + C_BORDER + "; -fx-border-width: 1 0 0 0;");
+        split.setStyle("-fx-background-color: rgba(0,0,0,0.08);");
 
         // SECURITY LEDGER (Left)
         VBox ledger = new VBox(); ledger.setPrefWidth(600);
-        ledger.setStyle("-fx-border-color: " + C_BORDER + "; -fx-border-width: 0 1 0 0; -fx-background-color: rgba(13, 17, 23, 0.5);");
+        ledger.setStyle("-fx-background-color: rgba(13, 17, 23, 0.45);");
         
         HBox lHdr = new HBox(12); lHdr.setPadding(new Insets(16, 32, 16, 32)); lHdr.setAlignment(Pos.CENTER_LEFT);
-        lHdr.setStyle("-fx-border-color: " + C_BORDER + "; -fx-border-width: 0 0 1 0;");
+        lHdr.setStyle("-fx-background-color: rgba(255,255,255,0.01);");
         Label i1 = new Label("≡ SECURITY LEDGER"); i1.setStyle("-fx-text-fill: white; -fx-font-weight: 900; -fx-font-size: 10px; -fx-letter-spacing: 0.15em;");
         Region sp = new Region(); HBox.setHgrow(sp, Priority.ALWAYS);
         HBox liveTag = new HBox(6); liveTag.setAlignment(Pos.CENTER); liveTag.setPadding(new Insets(4,10,4,10)); liveTag.setStyle("-fx-background-color: rgba(0,240,255,0.1); -fx-background-radius: 8px;");
@@ -645,7 +672,7 @@ public class AdminDashboard {
         HBox.setHgrow(term, Priority.ALWAYS);
         term.setStyle("-fx-background-color: rgba(0,0,0,0.2);");
 
-        HBox tHdr = new HBox(0); tHdr.setStyle("-fx-border-color: " + C_BORDER + "; -fx-border-width: 0 0 1 0;");
+        HBox tHdr = new HBox(0); tHdr.setStyle("-fx-background-color: rgba(255,255,255,0.01);");
         Label tb1 = new Label("TERMINAL"); tb1.setStyle("-fx-text-fill: " + C_PRIMARY + "; -fx-font-weight: 900; -fx-font-size: 10px; -fx-letter-spacing: 0.25em; -fx-padding: 16 32; -fx-border-color: " + C_PRIMARY + "; -fx-border-width: 0 0 2 0; -fx-background-color: rgba(0,240,255,0.02);");
         Label tb2 = new Label("CHAT"); tb2.setStyle("-fx-text-fill: rgba(255,255,255,0.3); -fx-font-weight: 900; -fx-font-size: 10px; -fx-letter-spacing: 0.25em; -fx-padding: 16 32;");
         Label tb3 = new Label("AI DIAGNOSTICS"); tb3.setStyle("-fx-text-fill: rgba(255,255,255,0.3); -fx-font-weight: 900; -fx-font-size: 10px; -fx-letter-spacing: 0.25em; -fx-padding: 16 32;");

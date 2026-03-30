@@ -19,8 +19,8 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 
 /**
- * King of Lab — redesigned login page.
- * Dark gradient background, crown branding, animated glow on logo.
+ * King of Lab — login page.
+ * Refined to match the Stitch "Command Sentinel" (Tactical Hologram) design system.
  */
 public class LoginView {
 
@@ -28,11 +28,15 @@ public class LoginView {
 
         // ========== ROOT ==========
         StackPane root = new StackPane();
-        root.setStyle("-fx-background-color: linear-gradient(to bottom right, #0a0a1a, #0f0f2e, #1a0a2e);");
+        root.setStyle(
+                StitchStyles.appRoot() +
+                "-fx-background-color: radial-gradient(radius 120%, " + StitchStyles.rgba(StitchStyles.C_PRIMARY, 0.12) + " 0%, " +
+                StitchStyles.C_SURFACE + " 55%, #070a0f 100%);"
+        );
 
         // Decorative circle backdrop
-        Circle glow = new Circle(200, Color.web("#6c3483", 0.08));
-        glow.setEffect(new DropShadow(80, Color.web("#9b59b6", 0.3)));
+        Circle glow = new Circle(220, Color.web(StitchStyles.C_PRIMARY, 0.08));
+        glow.setEffect(new DropShadow(90, Color.web(StitchStyles.C_PRIMARY, 0.22)));
         StackPane.setAlignment(glow, Pos.CENTER);
 
         // ========== LOGIN CARD ==========
@@ -41,12 +45,10 @@ public class LoginView {
         card.setPadding(new Insets(50, 60, 50, 60));
         card.setMaxWidth(420);
         card.setStyle(
-                "-fx-background-color: rgba(255,255,255,0.04);" +
-                "-fx-background-radius: 24;" +
-                "-fx-border-color: rgba(155,89,182,0.5);" +
-                "-fx-border-radius: 24;" +
-                "-fx-border-width: 1.5;");
-        card.setEffect(new DropShadow(40, Color.web("#9b59b6", 0.4)));
+                StitchStyles.glassPanel(0.60, 24) +
+                "-fx-padding: 50 60 50 60;"
+        );
+        card.setEffect(new DropShadow(44, Color.web(StitchStyles.C_PRIMARY, 0.10)));
 
         // Crown + Title
         Label crown = new Label("👑");
@@ -64,15 +66,15 @@ public class LoginView {
         glowAnim.play();
 
         Label title = new Label("KING OF LAB");
-        title.setFont(Font.font("Arial", FontWeight.EXTRA_BOLD, 30));
-        title.setStyle("-fx-text-fill: #c39bd3;");
-        title.setEffect(new DropShadow(12, Color.web("#9b59b6", 0.6)));
+        title.setFont(Font.font("Space Grotesk", FontWeight.EXTRA_BOLD, 30));
+        title.setStyle("-fx-text-fill: " + StitchStyles.C_TEXT_MAIN + "; -fx-letter-spacing: 0.12em;");
+        title.setEffect(new DropShadow(18, Color.web(StitchStyles.C_PRIMARY, 0.22)));
 
         Label subtitle = new Label("Lab Management System v3.0");
-        subtitle.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 12px;");
+        subtitle.setStyle("-fx-text-fill: " + StitchStyles.rgba(StitchStyles.C_TEXT_MAIN, 0.45) + "; -fx-font-size: 12px;");
 
         Separator sep = new Separator();
-        sep.setStyle("-fx-background-color: rgba(155,89,182,0.4);");
+        sep.setStyle("-fx-background-color: rgba(223,226,235,0.12);");
 
         // Fields
         TextField userField = createField("👤  Username");
@@ -81,24 +83,21 @@ public class LoginView {
         Button loginBtn = new Button("ENTER THE LAB");
         loginBtn.setMaxWidth(Double.MAX_VALUE);
         loginBtn.setStyle(
-                "-fx-background-color: linear-gradient(to right, #8e44ad, #9b59b6);" +
-                "-fx-text-fill: white;" +
-                "-fx-font-weight: bold;" +
-                "-fx-font-size: 14px;" +
-                "-fx-background-radius: 10;" +
-                "-fx-padding: 14 20;" +
-                "-fx-cursor: hand;");
-        loginBtn.setEffect(new DropShadow(12, Color.web("#9b59b6", 0.5)));
-        loginBtn.setOnMouseEntered(e -> loginBtn.setStyle(loginBtn.getStyle().replace("0.5)", "0.9)")));
-        loginBtn.setOnMouseExited(e  -> loginBtn.setStyle(loginBtn.getStyle().replace("0.9)", "0.5)")));
+                StitchStyles.gradientPrimaryCta(12) +
+                "-fx-font-size: 13px;" +
+                "-fx-padding: 14 20;"
+        );
+        loginBtn.setEffect(new DropShadow(18, Color.web(StitchStyles.C_PRIMARY, 0.22)));
+        loginBtn.setOnMouseEntered(e -> loginBtn.setOpacity(0.92));
+        loginBtn.setOnMouseExited(e  -> loginBtn.setOpacity(1.0));
 
         Label statusLbl = new Label("");
-        statusLbl.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 12px;");
+        statusLbl.setStyle("-fx-text-fill: #ffb4ab; -fx-font-size: 12px;");
 
         Button registerBtn = new Button("New Student? Register here");
         registerBtn.setStyle(
                 "-fx-background-color: transparent;" +
-                "-fx-text-fill: #9b59b6;" +
+                "-fx-text-fill: " + StitchStyles.rgba(StitchStyles.C_PRIMARY, 0.85) + ";" +
                 "-fx-underline: true;" +
                 "-fx-cursor: hand;");
 
@@ -152,15 +151,17 @@ public class LoginView {
         TextField f = new TextField();
         f.setPromptText(prompt);
         f.setStyle(
-                "-fx-background-color: rgba(255,255,255,0.07);" +
-                "-fx-text-fill: white;" +
-                "-fx-prompt-text-fill: #666;" +
-                "-fx-background-radius: 10;" +
+                "-fx-background-color: rgba(10,14,20,0.55);" +
+                "-fx-text-fill: " + StitchStyles.C_TEXT_MAIN + ";" +
+                "-fx-prompt-text-fill: rgba(223,226,235,0.28);" +
+                "-fx-background-radius: 12;" +
                 "-fx-padding: 12;" +
                 "-fx-font-size: 13px;");
         f.focusedProperty().addListener((obs, o, n) -> {
-            if (n) f.setStyle(f.getStyle() + "-fx-border-color: #9b59b6; -fx-border-radius: 10;");
-            else   f.setStyle(f.getStyle().replace("-fx-border-color: #9b59b6; -fx-border-radius: 10;", ""));
+            // "bottom glow" style hint (JavaFX can't do border-bottom only reliably without CSS),
+            // so we slightly brighten the surface and add a faint inner-glow border.
+            if (n) f.setStyle(f.getStyle() + "-fx-border-color: rgba(0,240,255,0.30); -fx-border-radius: 12;");
+            else   f.setStyle(f.getStyle().replace("-fx-border-color: rgba(0,240,255,0.30); -fx-border-radius: 12;", ""));
         });
         return f;
     }
@@ -169,10 +170,10 @@ public class LoginView {
         PasswordField f = new PasswordField();
         f.setPromptText(prompt);
         f.setStyle(
-                "-fx-background-color: rgba(255,255,255,0.07);" +
-                "-fx-text-fill: white;" +
-                "-fx-prompt-text-fill: #666;" +
-                "-fx-background-radius: 10;" +
+                "-fx-background-color: rgba(10,14,20,0.55);" +
+                "-fx-text-fill: " + StitchStyles.C_TEXT_MAIN + ";" +
+                "-fx-prompt-text-fill: rgba(223,226,235,0.28);" +
+                "-fx-background-radius: 12;" +
                 "-fx-padding: 12;" +
                 "-fx-font-size: 13px;");
         return f;
