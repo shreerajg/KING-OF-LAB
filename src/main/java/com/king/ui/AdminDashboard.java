@@ -42,10 +42,12 @@ public class AdminDashboard {
     private static Label            healthLabel;
     private static Label            sessionTimerLabel;
     
+    // Focus System
     private static StackPane        focusOverlay;
     private static ImageView        focusImgView;
     private static String           currentlyFocusedStudent;
 
+    // State Buttons
     private static Button           standardModeBtn;
     private static Button           ultraWebRtcBtn;
     private static Button           aiToggleBtn;
@@ -124,9 +126,14 @@ public class AdminDashboard {
 
         // Applying Global Stylesheet
         try {
-            root.getStylesheets().add(AdminDashboard.class.getResource("/stitch.css").toExternalForm());
+            java.net.URL cssURL = AdminDashboard.class.getResource("/stitch.css");
+            if(cssURL != null) {
+                root.getStylesheets().add(cssURL.toExternalForm());
+            } else {
+                AuditLogger.logError("CSS", "Could not load stitch.css (URL is null).");
+            }
         } catch (Exception e) {
-            AuditLogger.logError("CSS", "Could not load stitch.css");
+            AuditLogger.logError("CSS", "Could not load stitch.css. " + e.getMessage());
         }
 
         // 1. Top Navigation Bar
@@ -138,7 +145,7 @@ public class AdminDashboard {
         HBox.setHgrow(body, Priority.ALWAYS);
 
         // 2. Left Side Navigation
-        VBox sideNav = buildSideNavBar(user);
+        VBox sideNav = buildSideNavBar(user, stage);
         
         // 3. Main Flex Canvas
         VBox mainCanvas = buildMainCanvas(stage, user);
@@ -243,7 +250,7 @@ public class AdminDashboard {
     // -----------------------------------------------------------------------
     // SIDE NAVIGATION BAR
     // -----------------------------------------------------------------------
-    private static VBox buildSideNavBar(User user) {
+    private static VBox buildSideNavBar(User user, Stage stage) {
         VBox side = new VBox(0);
         side.setPrefWidth(256);
         side.setStyle("-fx-background-color: #0D1117; -fx-border-color: rgba(255,255,255,0.05); -fx-border-width: 0 1 0 0;");
@@ -276,16 +283,29 @@ public class AdminDashboard {
         Button navNet = new Button("🌐 NETWORK GUARD");
         navNet.getStyleClass().addAll("headline", "sidenav-btn");
         navNet.setMaxWidth(Double.MAX_VALUE);
+        navNet.setOnAction(e -> {
+            boolean current = !navNet.getStyleClass().contains("active");
+            if (current) {
+                HostsFileManager.blockSites();
+                appendActivity("NETWORK", "Global firewall restricted", WARNING_COLOR);
+                navNet.getStyleClass().add("active");
+            } else {
+                HostsFileManager.restoreHostsFile();
+                appendActivity("NETWORK", "Global firewall restored", SUCCESS_COLOR);
+                navNet.getStyleClass().remove("active");
+            }
+        });
 
         Button navPower = new Button("⏻ POWER CENTER");
         navPower.getStyleClass().addAll("headline", "sidenav-btn");
         navPower.setMaxWidth(Double.MAX_VALUE);
 
-        Button navAi = new Button("🤖 AI COMMAND");
-        navAi.getStyleClass().addAll("headline", "sidenav-btn");
-        navAi.setMaxWidth(Double.MAX_VALUE);
+        aiToggleBtn = new Button("🤖 AI COMMAND");
+        aiToggleBtn.getStyleClass().addAll("headline", "sidenav-btn");
+        aiToggleBtn.setMaxWidth(Double.MAX_VALUE);
+        aiToggleBtn.setOnAction(e -> toggleAi(user.getUsername()));
 
-        navMenu.getChildren().addAll(navClass, navNet, navPower, navAi);
+        navMenu.getChildren().addAll(navClass, navNet, navPower, aiToggleBtn);
         
         Region spacer = new Region(); VBox.setVgrow(spacer, Priority.ALWAYS);
 
@@ -301,14 +321,19 @@ public class AdminDashboard {
         broadcastBtn.setOnAction(e -> promptGlobalMessage());
 
         HBox terminalLogLinks = new HBox(10);
-        terminalLogLinks.setAlignment(Pos.CENTER_BETWEEN);
-        Label tLink = new Label("\uD83D\uDDBC Screenshots");
+        
+        Label tLink = new Label("📸 Screenshots");
         tLink.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-size: 10px; -fx-font-weight: bold; -fx-text-transform: uppercase; -fx-cursor: hand;");
-        tLink.setOnMouseClicked(e -> captureAllScreenshots(null));
+        tLink.setOnMouseClicked(e -> captureAllScreenshots(stage));
+        
+        Region innerSpacer = new Region(); 
+        HBox.setHgrow(innerSpacer, Priority.ALWAYS);
+        
         Label lLink = new Label("📁 Send File");
         lLink.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-size: 10px; -fx-font-weight: bold; -fx-text-transform: uppercase; -fx-cursor: hand;");
-        lLink.setOnMouseClicked(e -> sendFilesToStudents(null));
-        terminalLogLinks.getChildren().addAll(tLink, lLink);
+        lLink.setOnMouseClicked(e -> sendFilesToStudents(stage));
+        
+        terminalLogLinks.getChildren().addAll(tLink, innerSpacer, lLink);
         
         bottomActions.getChildren().addAll(broadcastBtn, terminalLogLinks);
 
@@ -333,8 +358,14 @@ public class AdminDashboard {
         VBox bClass = new VBox(12);
         Label lClass = new Label("CLASS ACCESS"); lClass.getStyleClass().add("section-label");
         HBox hcClass = new HBox(0); hcClass.getStyleClass().add("glass-panel"); hcClass.setPadding(new Insets(6));
-        Button btnLock = ribbonToggle("🔒 Lock", DANGER_COLOR); btnLock.setOnAction(e -> server.broadcast(pkt(CommandPacket.Type.LOCK, "{}")));
-        Button btnFree = ribbonToggle("🔓 Free", SUCCESS_COLOR); btnFree.setOnAction(e -> server.broadcast(pkt(CommandPacket.Type.UNLOCK, "{}")));
+        Button btnLock = ribbonToggle("🔒 Lock", DANGER_COLOR); btnLock.setOnAction(e -> {
+            server.broadcast(pkt(CommandPacket.Type.LOCK, "{}"));
+            appendActivity("SYSTEM", "Class Lockdown Initiated", WARNING_COLOR);
+        });
+        Button btnFree = ribbonToggle("🔓 Free", SUCCESS_COLOR); btnFree.setOnAction(e -> {
+            server.broadcast(pkt(CommandPacket.Type.UNLOCK, "{}"));
+            appendActivity("SYSTEM", "Class Access Restored", SUCCESS_COLOR);
+        });
         hcClass.getChildren().addAll(btnLock, btnFree);
         bClass.getChildren().addAll(lClass, hcClass);
 
@@ -342,17 +373,22 @@ public class AdminDashboard {
         VBox bConn = new VBox(12);
         Label lConn = new Label("CONNECTIVITY"); lConn.getStyleClass().add("section-label");
         HBox hcConn = new HBox(0); hcConn.getStyleClass().add("glass-panel"); hcConn.setPadding(new Insets(6));
-        Button btnBlk = ribbonToggle("🚫 Block", DANGER_COLOR); btnBlk.setOnAction(e -> { HostsFileManager.blockSites(); appendActivity("NET", "Hosts file blocked", WARNING_COLOR); });
-        Button btnAlw = ribbonToggle("✅ Allow", SUCCESS_COLOR); btnAlw.setOnAction(e -> { HostsFileManager.restoreHostsFile(); appendActivity("NET", "Hosts file restored", SUCCESS_COLOR); });
-        hcConn.getChildren().addAll(btnBlk, btnAlw);
+        Button btnBlk = ribbonToggle("🚫 Block URL", DANGER_COLOR); btnBlk.setOnAction(e -> openUrlOnAll()); 
+        hcConn.getChildren().addAll(btnBlk);
         bConn.getChildren().addAll(lConn, hcConn);
 
         // Box: Energy
         VBox bEgy = new VBox(12);
         Label lEgy = new Label("ENERGY"); lEgy.getStyleClass().add("section-label");
         HBox hcEgy = new HBox(12);
-        Button btnRest = ribbonIcon("🔄", WARNING_COLOR); btnRest.setOnAction(e -> server.broadcast(pkt(CommandPacket.Type.RESTART, "{}")));
-        Button btnShut = ribbonIcon("⏻", DANGER_COLOR); btnShut.setOnAction(e -> server.broadcast(pkt(CommandPacket.Type.SHUTDOWN, "{}")));
+        Button btnRest = ribbonIcon("🔄", WARNING_COLOR); btnRest.setOnAction(e -> {
+            server.broadcast(pkt(CommandPacket.Type.RESTART, "{}"));
+            appendActivity("ENERGY", "Global Reboot Signal Sent", WARNING_COLOR);
+        });
+        Button btnShut = ribbonIcon("⏻", DANGER_COLOR); btnShut.setOnAction(e -> {
+            server.broadcast(pkt(CommandPacket.Type.SHUTDOWN, "{}"));
+            appendActivity("ENERGY", "Global Shutdown Engine Triggered", DANGER_COLOR);
+        });
         hcEgy.getChildren().addAll(btnRest, btnShut);
         bEgy.getChildren().addAll(lEgy, hcEgy);
         
@@ -577,7 +613,8 @@ public class AdminDashboard {
         Region space = new Region(); HBox.setHgrow(space, Priority.ALWAYS);
         Button moreBtn = new Button("⋮");
         moreBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-size: 20px; -fx-cursor: hand;");
-        
+        moreBtn.setOnAction(e -> promptCommand(name));
+
         infoBox.getChildren().addAll(nBox, space, moreBtn);
         StackPane.setAlignment(infoBox, Pos.BOTTOM_CENTER);
 
@@ -614,8 +651,7 @@ public class AdminDashboard {
         } else {
             btn.setStyle("-fx-background-color: rgba(255,255,255,0.1); -fx-text-fill: " + color + "; -fx-font-size: 20px; -fx-padding: 10; -fx-background-radius: 50em; -fx-cursor: hand;");
         }
-        btn.setOnMouseEntered(e -> btn.setScaleX(1.1));
-        btn.setOnMouseEntered(e -> btn.setScaleY(1.1));
+        btn.setOnMouseEntered(e -> { btn.setScaleX(1.1); btn.setScaleY(1.1); });
         btn.setOnMouseExited(e -> { btn.setScaleX(1.0); btn.setScaleY(1.0); });
         return btn;
     }
@@ -764,6 +800,15 @@ public class AdminDashboard {
         }
     }
 
+    private static void toggleAi(String adminName) {
+        Config.aiEnabled = !Config.aiEnabled;
+        String payload = Config.aiEnabled ? "ENABLE" : "DISABLE";
+        server.broadcast(pkt(CommandPacket.Type.AI_TOGGLE, payload));
+        if(aiStatusLabel != null) aiStatusLabel.setText("AI: " + (Config.aiEnabled ? "ON" : "OFF"));
+        if(aiToggleBtn != null) aiToggleBtn.getStyleClass().add(Config.aiEnabled ? "active" : "inactive");
+        appendActivity("SYSTEM", "AI Assistance " + payload + "D", PRIMARY_CONTAINER);
+    }
+
     private static void promptMessage(String name) {
         TextInputDialog d = new TextInputDialog(); d.setHeaderText("Message to " + name);
         d.showAndWait().ifPresent(msg -> {
@@ -774,12 +819,33 @@ public class AdminDashboard {
         });
     }
 
+    private static void promptCommand(String name) {
+        TextInputDialog d = new TextInputDialog(); d.setHeaderText("Command for " + name);
+        d.showAndWait().ifPresent(cmd -> {
+            if (!cmd.trim().isEmpty()) {
+                server.sendToClient(name, pkt(CommandPacket.Type.SHELL, cmd));
+                appendActivity("SHELL", "Executed custom shell on " + name, SUCCESS_COLOR);
+            }
+        });
+    }
+
+
     private static void promptGlobalMessage() {
         TextInputDialog d = new TextInputDialog(); d.setHeaderText("Global Broadcast Message");
         d.showAndWait().ifPresent(msg -> {
             if (!msg.trim().isEmpty()) {
                 server.broadcast(pkt(CommandPacket.Type.MSG, msg));
                 appendActivity("MSG", "Global broadcast sent", PRIMARY_CONTAINER);
+            }
+        });
+    }
+
+    private static void openUrlOnAll() {
+        TextInputDialog d = new TextInputDialog("https://"); d.setHeaderText("Broadcast URL to all nodes");
+        d.showAndWait().ifPresent(url -> {
+            if (!url.trim().isEmpty()) {
+                server.broadcast(pkt(CommandPacket.Type.OPEN_URL, url));
+                appendActivity("NET", "Opened URL on all nodes: " + url, SUCCESS_COLOR);
             }
         });
     }
