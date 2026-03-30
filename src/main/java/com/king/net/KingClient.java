@@ -164,6 +164,9 @@ public class KingClient {
 
         if (screenScheduler != null && !screenScheduler.isShutdown()) return;
 
+        // Signal that streaming is now active — lets ScreenCapture lazy-start FFmpeg
+        AdaptiveStreamController.setStreamingActive(true);
+
         screenScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "KingClient-ScreenCapture");
             t.setDaemon(true);
@@ -202,7 +205,11 @@ public class KingClient {
     }
 
     private void stopScreenCapture() {
+        // Signal that streaming is inactive — ScreenCapture won't restart the pipe if it drops
+        AdaptiveStreamController.setStreamingActive(false);
         stopUltraBinaryStream();
+        // Kill the student FFmpeg capture process — frees GPU immediately
+        ScreenCapture.stopStudentPipe();
         if (screenScheduler != null) {
             screenScheduler.shutdownNow();
             screenScheduler = null;

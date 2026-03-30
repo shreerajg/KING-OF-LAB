@@ -2,6 +2,7 @@ package com.king.streaming.webrtc;
 
 import com.king.streaming.api.ScreenCapturer;
 import com.king.util.AuditLogger;
+import com.king.util.FfmpegResolver;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
@@ -70,13 +71,14 @@ public class DxgiCapturer implements ScreenCapturer {
     private boolean tryStartDdagrab() {
         try {
             ProcessBuilder pb = new ProcessBuilder(
-                "ffmpeg",
+                FfmpegResolver.get(),
                 "-loglevel", "quiet",
+                "-threads",  "2",
                 "-f",        "lavfi",
-                "-i",        "ddagrab=output_idx=0:framerate=60:draw_mouse=0",
-                "-vf",       "hwdownload,format=bgra,scale=iw:ih,format=yuv420p",
+                "-i",        "ddagrab=output_idx=0:framerate=20:draw_mouse=0",  // 20 FPS — cut GPU load
+                "-vf",       "hwdownload,format=bgra,scale=1280:-2,format=yuv420p",  // 1280px wide → ~55% less GPU
                 "-f",        "mjpeg",
-                "-q:v",      "4",
+                "-q:v",      "5",
                 "pipe:1"
             );
             ffmpegProc = pb.start();
@@ -92,10 +94,10 @@ public class DxgiCapturer implements ScreenCapturer {
 
             readerThread = new Thread(this::readMjpeg, "DxgiCapturer-ddagrab-Reader");
             readerThread.setDaemon(true);
-            readerThread.setPriority(Thread.MAX_PRIORITY - 1);
+            readerThread.setPriority(Thread.NORM_PRIORITY);  // was MAX_PRIORITY-1
             readerThread.start();
 
-            AuditLogger.logSystem("[DxgiCapturer] ddagrab MJPEG pipe started (DXGI, cursor-free, 60 FPS)");
+            AuditLogger.logSystem("[DxgiCapturer] ddagrab MJPEG pipe started (DXGI, cursor-free, 20 FPS)");
             return true;
 
         } catch (Exception e) {
@@ -112,14 +114,16 @@ public class DxgiCapturer implements ScreenCapturer {
     private void tryStartGdigrab() {
         try {
             ProcessBuilder pb = new ProcessBuilder(
-                "ffmpeg",
+                FfmpegResolver.get(),
                 "-loglevel",   "quiet",
+                "-threads",    "2",
                 "-f",          "gdigrab",
-                "-framerate",  "60",
-                "-draw_mouse", "0",   // exclude cursor at OS level
+                "-framerate",  "20",            // 20 FPS fallback
+                "-draw_mouse", "0",
                 "-i",          "desktop",
+                "-vf",         "scale=1280:-2", // cap resolution
                 "-f",          "mjpeg",
-                "-q:v",        "4",
+                "-q:v",        "5",
                 "pipe:1"
             );
             ffmpegProc = pb.start();
@@ -127,10 +131,10 @@ public class DxgiCapturer implements ScreenCapturer {
 
             readerThread = new Thread(this::readMjpeg, "DxgiCapturer-gdigrab-Reader");
             readerThread.setDaemon(true);
-            readerThread.setPriority(Thread.MAX_PRIORITY - 1);
+            readerThread.setPriority(Thread.NORM_PRIORITY);  // was MAX_PRIORITY-1
             readerThread.start();
 
-            AuditLogger.logSystem("[DxgiCapturer] gdigrab MJPEG pipe started (fallback, draw_mouse=0, 60 FPS)");
+            AuditLogger.logSystem("[DxgiCapturer] gdigrab MJPEG pipe started (fallback, draw_mouse=0, 20 FPS)");
 
         } catch (Exception e) {
             isCapturing.set(false);

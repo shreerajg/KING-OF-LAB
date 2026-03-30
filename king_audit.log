@@ -467,3 +467,45 @@
 [2026-03-29 20:01:43] [SYSTEM] Stream Mode switched to ULTRA_WEBRTC
 [2026-03-29 20:15:49] [DISCONNECT] Student disconnected: shree
 [2026-03-29 20:15:49] [ERROR] [BinaryStream] Connection reset
+[2026-03-29 20:39:03] [SYSTEM] King of Lab v3.0 started
+[2026-03-29 20:39:03] [SYSTEM] Database initialised
+[2026-03-29 20:39:09] [LOGIN] admin logged in successfully
+[2026-03-29 20:39:09] [SYSTEM] King of Lab Admin started
+[2026-03-29 20:39:09] [SYSTEM] King Server listening on port 5555
+[2026-03-29 20:39:09] [SYSTEM] Ultra-Binary Stream Server listening on port 5556
+[2026-03-29 20:39:23] [SYSTEM] King of Lab v3.0 started
+[2026-03-29 20:39:23] [SYSTEM] Database initialised
+[2026-03-29 20:39:28] [LOGIN] shree logged in successfully
+[2026-03-29 20:39:29] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-29 20:39:29] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-29 20:39:29] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-29 20:42:46] [SYSTEM] King of Lab v3.0 started
+[2026-03-29 20:42:46] [SYSTEM] Database initialised
+[2026-03-29 20:42:50] [LOGIN] admin LOGIN FAILED
+[2026-03-29 20:42:52] [LOGIN] admin logged in successfully
+[2026-03-29 20:42:52] [SYSTEM] King of Lab Admin started
+[2026-03-29 20:42:52] [SYSTEM] King Server listening on port 5555
+[2026-03-29 20:42:52] [SYSTEM] Ultra-Binary Stream Server listening on port 5556
+[2026-03-29 20:43:04] [SYSTEM] King of Lab v3.0 started
+[2026-03-29 20:43:04] [SYSTEM] Database initialised
+[2026-03-29 20:43:08] [LOGIN] shree logged in successfully
+[2026-03-29 20:43:08] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-29 20:43:08] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-29 20:43:08] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-03-29 20:43:27] [SYSTEM] Switching Stream Mode to: ULTRA_WEBRTC
+[2026-03-29 20:43:27] [SYSTEM] Stream Mode switched to ULTRA_WEBRTC
+[2026-03-29 20:44:02] [SYSTEM] Switching Stream Mode to: LEGACY_CPU
+[2026-03-29 20:44:02] [SYSTEM] Stream Mode switched to LEGACY_CPU
+[2026-03-29 20:44:02] [ERROR] [UltraStream] Cannot enter synchronized block because "this.bOut" is null
+[2026-03-30 19:42:24] [SYSTEM] King of Lab v3.0 started
+[2026-03-30 19:42:24] [SYSTEM] Database initialised
+[2026-03-30 19:42:30] [LOGIN] admin logged in successfully
+[2026-03-30 19:42:30] [SYSTEM] King of Lab Admin started
+[2026-03-30 19:42:30] [SYSTEM] King Server listening on port 5555
+[2026-03-30 19:42:30] [SYSTEM] Ultra-Binary Stream Server listening on port 5556
+[2026-03-30 19:42:59] [SYSTEM] King of Lab v3.0 started
+[2026-03-30 19:42:59] [SYSTEM] Database initialised
+[2026-03-30 19:43:04] [LOGIN] shree logged in successfully
+[2026-03-30 19:43:04] [SYSTEM] Student shree discovered admin at 127.0.0.1
+[2026-03-30 19:43:04] [SYSTEM] Connected to admin at 127.0.0.1
+[2026-03-30 19:43:04] [CONNECT] Student connected: shree (Roll:73 SYA)

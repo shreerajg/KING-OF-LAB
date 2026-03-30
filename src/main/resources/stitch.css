@@ -1,0 +1,176 @@
+/* Stitch "Tactical Hologram" Theme for Admin Dashboard */
+
+* {
+    -fx-font-family: "Inter", "Segoe UI", sans-serif;
+}
+
+.root {
+    -fx-background-color: #0A0E14;
+}
+
+/* Typography */
+.headline {
+    -fx-font-family: "Space Grotesk", "Inter", sans-serif;
+}
+
+.title-text {
+    -fx-text-fill: #00F0FF;
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-letter-spacing: 0.05em;
+}
+
+.nav-link {
+    -fx-text-fill: rgba(223, 226, 235, 0.4);
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-transform: uppercase;
+    -fx-padding: 0 0 4 0;
+    -fx-cursor: hand;
+}
+
+.nav-link:hover {
+    -fx-text-fill: #DFE2EB;
+}
+
+.nav-link.active {
+    -fx-text-fill: #00F0FF;
+    -fx-border-color: #00F0FF;
+    -fx-border-width: 0 0 2 0;
+}
+
+/* Glass Panels */
+.glass-panel {
+    -fx-background-color: rgba(16, 20, 26, 0.4);
+    -fx-border-color: rgba(255, 255, 255, 0.05);
+    -fx-border-radius: 12px;
+    -fx-background-radius: 12px;
+}
+
+.glass-panel-high {
+    -fx-background-color: rgba(28, 32, 38, 0.4);
+    -fx-border-color: rgba(255, 255, 255, 0.05);
+    -fx-border-radius: 24px;
+    -fx-background-radius: 24px;
+}
+
+/* SideNav Buttons */
+.sidenav-btn {
+    -fx-background-color: transparent;
+    -fx-text-fill: rgba(223, 226, 235, 0.5);
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-alignment: center-left;
+    -fx-padding: 14 20;
+    -fx-background-radius: 12px;
+    -fx-cursor: hand;
+}
+
+.sidenav-btn:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.05);
+    -fx-text-fill: #DFE2EB;
+}
+
+.sidenav-btn.active {
+    -fx-background-color: rgba(0, 240, 255, 0.05);
+    -fx-text-fill: #00F0FF;
+    -fx-border-color: rgba(0, 240, 255, 0.1);
+    -fx-border-radius: 12px;
+}
+
+/* Premium Buttons */
+.btn-warm-cyan {
+    -fx-background-color: linear-gradient(to bottom right, #00dbe9 0%, #00f0ff 100%);
+    -fx-text-fill: #002022;
+    -fx-font-weight: bold;
+    -fx-background-radius: 12px;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0, 240, 255, 0.25), 20, 0, 0, 8);
+}
+
+.btn-warm-cyan:hover {
+    -fx-effect: dropshadow(gaussian, rgba(0, 240, 255, 0.4), 25, 0, 0, 8);
+}
+
+.btn-glass {
+    -fx-background-color: rgba(255, 255, 255, 0.05);
+    -fx-text-fill: rgba(223, 226, 235, 0.7);
+    -fx-font-weight: bold;
+    -fx-background-radius: 12px;
+    -fx-cursor: hand;
+}
+
+.btn-glass:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+    -fx-text-fill: #DFE2EB;
+}
+
+/* Specific Tints */
+.text-cyan { -fx-text-fill: #00F0FF; }
+.text-purple { -fx-text-fill: #dcb8ff; }
+.text-amber { -fx-text-fill: #FFC857; }
+.text-danger { -fx-text-fill: #ffb4ab; }
+.text-success { -fx-text-fill: #7af19c; }
+
+/* Dashboard Grids/Subtexts */
+.section-label {
+    -fx-text-fill: rgba(223, 226, 235, 0.4);
+    -fx-font-size: 9px;
+    -fx-font-weight: bold;
+    -fx-letter-spacing: 0.25em;
+}
+
+/* ScrollBars */
+.scroll-pane {
+    -fx-background-color: transparent;
+}
+.scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+.scroll-bar:vertical, .scroll-bar:horizontal {
+    -fx-background-color: transparent;
+}
+.scroll-bar:vertical .thumb, .scroll-bar:horizontal .thumb {
+    -fx-background-color: rgba(132, 148, 149, 0.2);
+    -fx-background-radius: 10px;
+}
+
+/* Terminal & Activity */
+.terminal-tab-btn {
+    -fx-background-color: transparent;
+    -fx-text-fill: rgba(223, 226, 235, 0.3);
+    -fx-font-weight: bold;
+    -fx-font-size: 10px;
+    -fx-padding: 16 32;
+    -fx-cursor: hand;
+}
+.terminal-tab-btn.active {
+    -fx-text-fill: #00F0FF;
+    -fx-border-color: #00F0FF;
+    -fx-border-width: 0 0 2 0;
+    -fx-background-color: rgba(0, 240, 255, 0.05);
+}
+
+.list-view, .text-area {
+    -fx-control-inner-background: #0A0E14;
+    -fx-background-color: transparent;
+}
+.list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #DFE2EB;
+}
+.list-cell:empty {
+    -fx-background-color: transparent;
+}
+
+.txt-input {
+    -fx-background-color: rgba(10, 14, 20, 0.5);
+    -fx-border-color: rgba(255, 255, 255, 0.05);
+    -fx-border-radius: 12px;
+    -fx-background-radius: 12px;
+    -fx-text-fill: white;
+    -fx-prompt-text-fill: rgba(223, 226, 235, 0.2);
+}
+.txt-input:focused {
+    -fx-border-color: rgba(0, 240, 255, 0.5);
+}

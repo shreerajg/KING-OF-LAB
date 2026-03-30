@@ -66,9 +66,10 @@ public class ScreenCapture {
     // -----------------------------------------------------------------------
     // Static init — start student pipe immediately
     // -----------------------------------------------------------------------
+    // NOTE: Student pipe starts LAZILY on first captureForStreaming() / captureAsBytes()
+    // call — do NOT eagerly start at class-load time (wastes GPU when no admin is watching).
     static {
         FfmpegResolver.logResolved();
-        startStudentPipe();
     }
 
     // -----------------------------------------------------------------------
@@ -104,11 +105,12 @@ public class ScreenCapture {
             ProcessBuilder pb = new ProcessBuilder(
                 FfmpegResolver.get(),
                 "-loglevel", "quiet",
+                "-threads",  "2",              // cap CPU thread count
                 "-f",        "lavfi",
-                "-i",        "ddagrab=output_idx=0:framerate=30:draw_mouse=0",
-                "-vf",       "hwdownload,format=bgra,scale=iw:ih,format=yuv420p",
+                "-i",        "ddagrab=output_idx=0:framerate=20:draw_mouse=0",  // 20 FPS — legible & low GPU
+                "-vf",       "hwdownload,format=bgra,scale=1280:-2,format=yuv420p",  // cap width 1280 → ~55% less GPU
                 "-f",        "mjpeg",
-                "-q:v",      "4",
+                "-q:v",      "5",              // slightly lower quality → faster encode
                 "pipe:1"
             );
             Process p = pb.start();
@@ -128,7 +130,7 @@ public class ScreenCapture {
                 () -> readMjpeg(studentProc, latestStudentJpeg, studentPipeUp),
                 "FFmpeg-Student-ddagrab-Reader");
             studentReader.setDaemon(true);
-            studentReader.setPriority(Thread.MAX_PRIORITY - 1);
+            studentReader.setPriority(Thread.NORM_PRIORITY);  // was MAX_PRIORITY-1; no need to starve UI
             studentReader.start();
 
             System.out.println("[ScreenCapture] Student pipe started via ddagrab (DXGI, cursor-free, 30 FPS)");
@@ -150,12 +152,14 @@ public class ScreenCapture {
             ProcessBuilder pb = new ProcessBuilder(
                 FfmpegResolver.get(),
                 "-loglevel",   "quiet",
+                "-threads",    "2",
                 "-f",          "gdigrab",
-                "-framerate",  "30",
+                "-framerate",  "20",             // 20 FPS fallback
                 "-draw_mouse", "0",
                 "-i",          "desktop",
+                "-vf",         "scale=1280:-2",  // cap resolution
                 "-f",          "mjpeg",
-                "-q:v",        "4",
+                "-q:v",        "5",
                 "pipe:1"
             );
             studentProc = pb.start();
@@ -166,7 +170,7 @@ public class ScreenCapture {
                 () -> readMjpeg(studentProc, latestStudentJpeg, studentPipeUp),
                 "FFmpeg-Student-gdigrab-Reader");
             studentReader.setDaemon(true);
-            studentReader.setPriority(Thread.MAX_PRIORITY - 1);
+            studentReader.setPriority(Thread.NORM_PRIORITY);
             studentReader.start();
 
             System.out.println("[ScreenCapture] Student pipe started via gdigrab fallback (draw_mouse=0, 30 FPS)");
@@ -217,7 +221,7 @@ public class ScreenCapture {
                 () -> readMjpeg(adminProc, latestAdminJpeg, adminPipeUp),
                 "FFmpeg-Admin-ddagrab-Reader");
             adminReader.setDaemon(true);
-            adminReader.setPriority(Thread.MAX_PRIORITY - 2);
+            adminReader.setPriority(Thread.NORM_PRIORITY - 1);
             adminReader.start();
 
             System.out.println("[ScreenCapture] Admin pipe started via ddagrab");
@@ -249,7 +253,7 @@ public class ScreenCapture {
                 () -> readMjpeg(adminProc, latestAdminJpeg, adminPipeUp),
                 "FFmpeg-Admin-gdigrab-Reader");
             adminReader.setDaemon(true);
-            adminReader.setPriority(Thread.MAX_PRIORITY - 2);
+            adminReader.setPriority(Thread.NORM_PRIORITY - 1);
             adminReader.start();
 
         } catch (Exception e) {
@@ -263,6 +267,20 @@ public class ScreenCapture {
         if (adminProc   != null) { adminProc.destroyForcibly();   adminProc   = null; }
         if (adminReader != null) { adminReader.interrupt();        adminReader = null; }
         latestAdminJpeg.set(null);
+    }
+
+    /**
+     * Tears down the student FFmpeg capture pipe.
+     * Call this when the admin disconnects so the GPU-intensive capture process
+     * is not left running in the background unnecessarily.
+     * The pipe will restart lazily on the next captureForStreaming() / captureAsBytes() call.
+     */
+    public static synchronized void stopStudentPipe() {
+        studentPipeUp.set(false);
+        if (studentProc   != null) { studentProc.destroyForcibly();   studentProc   = null; }
+        if (studentReader != null) { studentReader.interrupt();        studentReader = null; }
+        latestStudentJpeg.set(null);
+        System.out.println("[ScreenCapture] Student pipe stopped (no admin connected — GPU freed)");
     }
 
     // -----------------------------------------------------------------------
@@ -333,7 +351,8 @@ public class ScreenCapture {
      * Returns null if no new frame has arrived (frame-drop semantics).
      */
     public static String captureForStreaming() {
-        if (!studentPipeUp.get()) return null;
+        // Lazy-start: spin up the student pipe on first real demand
+        if (!studentPipeUp.get()) startStudentPipe();
         byte[] jpeg = latestStudentJpeg.getAndSet(null);
         if (jpeg == null) return null;
         return Base64.getEncoder().encodeToString(jpeg);
@@ -345,7 +364,8 @@ public class ScreenCapture {
      * Returns null if no new frame has arrived.
      */
     public static byte[] captureAsBytes() {
-        if (!studentPipeUp.get()) return null;
+        // Lazy-start: spin up the student pipe on first real demand
+        if (!studentPipeUp.get()) startStudentPipe();
         return latestStudentJpeg.getAndSet(null);
     }
 
