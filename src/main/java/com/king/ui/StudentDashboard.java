@@ -46,7 +46,7 @@ public class StudentDashboard {
     private static VBox       focusOverlay;
     private static VBox       pollOverlay;
     private static ImageView  streamView;
-    private static ImageView  bgImageView;
+    // Background replaced by CSS styling
     private static TextArea   chatArea;
     private static VBox       chatPanel;
     private static VBox       aiPanel;
@@ -59,31 +59,8 @@ public class StudentDashboard {
     private static String currentUsername;
 
     private static String downloadFolder = System.getProperty("user.home") + "/Downloads/KingLab";
-    private static final java.util.prefs.Preferences prefs = java.util.prefs.Preferences.userNodeForPackage(StudentDashboard.class);
-    private static String currentTheme = prefs.get("studentTheme", "cyberpunk");
-    // Hand raise state
     private static boolean handRaised = false;
     private static Button  raiseHandBtn;
-
-    // Theme definitions: {key, displayName, gradient, imageFile (or null)}
-    private static final Object[][] THEMES = {
-        // Picture themes
-        {"cars_bmw",    "🚗 BMW Cars",      null,                           "theme_cars.png"},
-        {"cars_race",   "🏎 Race Cars",     null,                           "theme_cars2.png"},
-        {"pink_floral", "🌸 Pink & Floral", null,                           "theme_pink.png"},
-        {"galaxy",      "🌌 Galaxy",        null,                           "theme_galaxy.png"},
-        // Pure gradient themes
-        {"cyberpunk",   "🌃 Cyberpunk",     "#0f0f1f, #1a1a3e",             null},
-        {"ocean",       "🌊 Ocean",         "#0c2461, #1e3799",             null},
-        {"midnight",    "🌙 Midnight",      "#0a0a0a, #1a1a1a",             null},
-        {"matrix",      "💚 Matrix",        "#001100, #003300",             null},
-        {"neon",        "🔮 Neon",          "#1a0033, #330066",             null},
-        {"solarized",   "☀️ Solarized",     "#002b36, #073642",             null},
-        {"dracula",     "🧛 Dracula",       "#282a36, #44475a",             null},
-        {"lava",        "🌋 Lava",          "#1a0500, #3a0a00",             null},
-        {"arctic",      "❄️ Arctic",        "#0a1a2e, #1a2e4a",             null},
-        {"forest",      "🌲 Forest",        "#0a1a0a, #1a3a1a",             null},
-    };
 
     // -----------------------------------------------------------------------
     // SHOW
@@ -108,25 +85,14 @@ public class StudentDashboard {
         discoveryService.startListening();
 
         root = new StackPane();
-        root.setStyle("-fx-background-color: #07070f;");
+        root.setStyle(StitchStyles.appRoot());
 
-        // Background image layer (for picture themes) — blurred, fills entire screen
-        bgImageView = new ImageView();
-        bgImageView.setPreserveRatio(false);
-        bgImageView.fitWidthProperty().bind(root.widthProperty());
-        bgImageView.fitHeightProperty().bind(root.heightProperty());
-        // Slight blur so text reads comfortably over the image
-        bgImageView.setEffect(new GaussianBlur(2));
-        bgImageView.setOpacity(1.0);
-
-        // Dark semi-transparent overlay so UI elements are clearly visible
-        Region darkOverlay = new Region();
-        darkOverlay.setStyle("-fx-background-color: rgba(0,0,0,0.25);");
-        darkOverlay.setMouseTransparent(true);
-        darkOverlay.prefWidthProperty().bind(root.widthProperty());
-        darkOverlay.prefHeightProperty().bind(root.heightProperty());
-
-        applyTheme(currentTheme);
+        // Dark tech grid/radial background
+        Region bgLayer = new Region();
+        bgLayer.setStyle("-fx-background-color: radial-gradient(radius 120%, " + StitchStyles.rgba(StitchStyles.C_PRIMARY, 0.05) + " 0%, " +
+                StitchStyles.C_SURFACE + " 65%, #05070a 100%);");
+        bgLayer.prefWidthProperty().bind(root.widthProperty());
+        bgLayer.prefHeightProperty().bind(root.heightProperty());
 
         // ===== MAIN CONTENT =====
         BorderPane main = new BorderPane();
@@ -137,7 +103,7 @@ public class StudentDashboard {
         main.setCenter(buildCenterArea());
         main.setBottom(buildToolbar());
 
-        root.getChildren().addAll(bgImageView, darkOverlay, main);
+        root.getChildren().addAll(bgLayer, main);
 
         // ===== NOTIFICATION (slides in from top) =====
         notificationLabel = new Label();
@@ -204,17 +170,13 @@ public class StudentDashboard {
     private static HBox buildHeader(User user) {
         HBox header = new HBox(16);
         header.setAlignment(Pos.CENTER_LEFT);
-        header.setPadding(new Insets(10, 18, 10, 18));
-        header.setStyle(
-                "-fx-background-color: rgba(0,0,0,0.52);" +
-                "-fx-background-radius: 16;" +
-                "-fx-border-color: rgba(255,255,255,0.06);" +
-                "-fx-border-radius: 16;");
+        header.setPadding(new Insets(10, 24, 10, 24));
+        header.setStyle(StitchStyles.glassPanel(0.55, 16));
 
-        // Animated crown logo
-        Label logo = new Label("👑 KING");
-        logo.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #c39bd3;");
-        Glow logoGlow = new Glow(0.5);
+        // Animated logo
+        Label logo = new Label("KING OF LAB");
+        logo.setStyle("-fx-font-size: 16px; -fx-font-weight: 900; -fx-letter-spacing: 0.15em; -fx-text-fill: " + StitchStyles.C_PRIMARY + ";");
+        Glow logoGlow = new Glow(0.6);
         logo.setEffect(logoGlow);
         Timeline logoAnim = new Timeline(
                 new KeyFrame(Duration.ZERO,     new KeyValue(logoGlow.levelProperty(), 0.3)),
@@ -227,10 +189,11 @@ public class StudentDashboard {
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         // Status indicator
-        HBox statusBox = new HBox(7);
+        HBox statusBox = new HBox(8);
         statusBox.setAlignment(Pos.CENTER);
-        statusBox.setStyle("-fx-background-color: rgba(255,255,255,0.06); -fx-background-radius: 20; -fx-padding: 5 12;");
-        statusDot = new Circle(5, Color.web("#f39c12"));
+        statusBox.setStyle("-fx-background-color: rgba(0, 240, 255, 0.05); -fx-background-radius: 20; -fx-padding: 6 16; -fx-border-color: rgba(0, 240, 255, 0.15); -fx-border-radius: 20;");
+        statusDot = new Circle(4, Color.web("#ffc857")); // Warning
+        statusDot.setEffect(new DropShadow(8, Color.web("#ffc857")));
         // Pulsing status dot
         ScaleTransition dotPulse = new ScaleTransition(Duration.seconds(1.2), statusDot);
         dotPulse.setFromX(0.7); dotPulse.setToX(1.3);
@@ -238,45 +201,29 @@ public class StudentDashboard {
         dotPulse.setCycleCount(Animation.INDEFINITE);
         dotPulse.setAutoReverse(true);
         dotPulse.play();
-        statusLabel = new Label("Searching...");
-        statusLabel.setStyle("-fx-text-fill: #888; -fx-font-size: 11px;");
+        statusLabel = new Label("SEARCHING...");
+        statusLabel.setStyle("-fx-text-fill: " + StitchStyles.rgba(StitchStyles.C_TEXT_MAIN, 0.6) + "; -fx-font-size: 10px; -fx-font-weight: 900; -fx-letter-spacing: 0.1em;");
         statusBox.getChildren().addAll(statusDot, statusLabel);
 
         // Raise Hand button (always visible in header)
-        raiseHandBtn = new Button("✋ Raise Hand");
+        raiseHandBtn = new Button("✋ RAISE HAND");
         raiseHandBtn.setStyle(
-                "-fx-background-color: rgba(241,196,15,0.15);" +
-                "-fx-text-fill: #f1c40f;" +
-                "-fx-font-weight: bold;" +
+                "-fx-background-color: rgba(157, 92, 255, 0.1);" +
+                "-fx-text-fill: #9D5CFF;" +
+                "-fx-font-weight: 900;" +
+                "-fx-font-size: 10px;" +
+                "-fx-letter-spacing: 0.1em;" +
                 "-fx-background-radius: 20;" +
-                "-fx-padding: 7 16;" +
+                "-fx-padding: 8 20;" +
                 "-fx-cursor: hand;" +
-                "-fx-border-color: rgba(241,196,15,0.4);" +
+                "-fx-border-color: rgba(157, 92, 255, 0.3);" +
                 "-fx-border-radius: 20;");
         raiseHandBtn.setOnAction(e -> toggleRaiseHand());
 
-        // Theme selector
-        ComboBox<String> themeBox = new ComboBox<>();
-        for (Object[] t : THEMES) {
-            themeBox.getItems().add((String) t[1]);
-            if (t[0].equals(currentTheme)) themeBox.setValue((String) t[1]);
-        }
-        if (themeBox.getValue() == null) themeBox.setValue("🌃 Cyberpunk");
-        themeBox.setMaxWidth(140);
-        themeBox.setStyle("-fx-background-color: rgba(255,255,255,0.08);");
-        themeBox.setOnAction(e -> {
-            int idx = themeBox.getSelectionModel().getSelectedIndex();
-            if (idx >= 0) {
-                currentTheme = (String) THEMES[idx][0];
-                prefs.put("studentTheme", currentTheme);
-                applyTheme(currentTheme);
-            }
-        });
+        Label userLabel = new Label("👤 " + user.getUsername().toUpperCase());
+        userLabel.setStyle("-fx-text-fill: " + StitchStyles.C_TEXT_MAIN + "; -fx-font-weight: 900; -fx-font-size: 11px; -fx-letter-spacing: 0.1em;");
 
-        Label userLabel = new Label("👤 " + user.getUsername());
-        userLabel.setStyle("-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 12px;");
-
-        header.getChildren().addAll(logo, spacer, raiseHandBtn, statusBox, userLabel, themeBox);
+        header.getChildren().addAll(logo, spacer, raiseHandBtn, statusBox, userLabel);
         return header;
     }
 
@@ -285,30 +232,27 @@ public class StudentDashboard {
     // -----------------------------------------------------------------------
 
     private static VBox buildCenterArea() {
-        VBox container = new VBox(10);
+        VBox container = new VBox(12);
         container.setAlignment(Pos.CENTER);
-        container.setPadding(new Insets(8, 0, 8, 0));
+        container.setPadding(new Insets(16, 0, 16, 0));
         VBox.setVgrow(container, Priority.ALWAYS);
 
         // Stream title with live indicator
-        HBox streamHeader = new HBox(10);
+        HBox streamHeader = new HBox(12);
         streamHeader.setAlignment(Pos.CENTER_LEFT);
-        Circle liveIndicator = new Circle(5, Color.web("#e74c3c"));
+        Circle liveIndicator = new Circle(4, Color.web(StitchStyles.C_PRIMARY));
+        liveIndicator.setEffect(new DropShadow(8, Color.web(StitchStyles.C_PRIMARY)));
         FadeTransition liveFade = new FadeTransition(Duration.seconds(0.9), liveIndicator);
         liveFade.setFromValue(0.2); liveFade.setToValue(1.0);
         liveFade.setCycleCount(Animation.INDEFINITE); liveFade.setAutoReverse(true);
         liveFade.play();
-        Label streamTitle = new Label("ADMIN LIVE STREAM   —   Click to fullscreen");
-        streamTitle.setStyle("-fx-font-size: 13px; -fx-text-fill: rgba(255,255,255,0.6); -fx-font-weight: bold;");
+        Label streamTitle = new Label("ACTIVE NODE STREAM   —   CLICK TO FULLSCREEN");
+        streamTitle.setStyle("-fx-font-size: 10px; -fx-letter-spacing: 0.15em; -fx-text-fill: " + StitchStyles.rgba(StitchStyles.C_TEXT_MAIN, 0.5) + "; -fx-font-weight: 900;");
         streamHeader.getChildren().addAll(liveIndicator, streamTitle);
 
         // Stream viewport
         StackPane streamBox = new StackPane();
-        streamBox.setStyle(
-                "-fx-background-color: rgba(0,0,0,0.6);" +
-                "-fx-background-radius: 16;" +
-                "-fx-cursor: hand;");
-        streamBox.setEffect(new DropShadow(25, Color.web("#9b59b6", 0.3)));
+        streamBox.setStyle(StitchStyles.glassPanel(0.4, 20) + "-fx-cursor: hand;");
         streamBox.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         VBox.setVgrow(streamBox, Priority.ALWAYS);
 
@@ -317,18 +261,19 @@ public class StudentDashboard {
         streamView.fitWidthProperty().bind(streamBox.widthProperty().subtract(16));
         streamView.fitHeightProperty().bind(streamBox.heightProperty().subtract(16));
 
-        VBox waitBox = new VBox(10);
+        VBox waitBox = new VBox(12);
         waitBox.setAlignment(Pos.CENTER);
         waitBox.setId("waitBox");
-        Label waitIcon = new Label("📺");
-        waitIcon.setStyle("-fx-font-size: 48px;");
+        Label waitIcon = new Label("📡");
+        waitIcon.setStyle("-fx-font-size: 40px; -fx-text-fill: " + StitchStyles.C_PRIMARY + ";");
+        waitIcon.setEffect(new DropShadow(15, Color.web(StitchStyles.C_PRIMARY, 0.4)));
         TranslateTransition waitBob = new TranslateTransition(Duration.seconds(1.8), waitIcon);
-        waitBob.setByY(-12); waitBob.setAutoReverse(true); waitBob.setCycleCount(Animation.INDEFINITE);
+        waitBob.setByY(-10); waitBob.setAutoReverse(true); waitBob.setCycleCount(Animation.INDEFINITE);
         waitBob.play();
-        Label waitLabel = new Label("Waiting for Admin to start screen share...");
-        waitLabel.setStyle("-fx-text-fill: #555; -fx-font-size: 16px;");
-        Label waitSub   = new Label("Your screen is being monitored in the background");
-        waitSub.setStyle("-fx-text-fill: #333; -fx-font-size: 11px;");
+        Label waitLabel = new Label("WAITING FOR SIGNAL...");
+        waitLabel.setStyle("-fx-text-fill: " + StitchStyles.C_TEXT_MAIN + "; -fx-font-size: 16px; -fx-font-weight: 800; -fx-letter-spacing: 0.1em;");
+        Label waitSub   = new Label("NODE STANDBY. BACKGROUND TELEMETRY ACTIVE.");
+        waitSub.setStyle("-fx-text-fill: " + StitchStyles.rgba(StitchStyles.C_TEXT_MAIN, 0.4) + "; -fx-font-size: 10px; -fx-letter-spacing: 0.15em; -fx-font-weight: 800;");
         waitBox.getChildren().addAll(waitIcon, waitLabel, waitSub);
 
         streamBox.getChildren().addAll(waitBox, streamView);
@@ -343,40 +288,43 @@ public class StudentDashboard {
     // -----------------------------------------------------------------------
 
     private static HBox buildToolbar() {
-        HBox toolbar = new HBox(12);
+        HBox toolbar = new HBox(16);
         toolbar.setAlignment(Pos.CENTER);
         toolbar.setPadding(new Insets(12));
-        toolbar.setStyle(
-                "-fx-background-color: rgba(0,0,0,0.55);" +
-                "-fx-background-radius: 16 16 0 0;");
+        toolbar.setStyle(StitchStyles.glassPanel(0.5, 24));
 
         toolbar.getChildren().addAll(
-                toolBtn("💬 Chat",     "#2980b9", () -> slideToggle(chatPanel, true,  aiPanel, settingsPanel)),
-                toolBtn("🤖 King AI", "#7d3c98", () -> slideToggle(aiPanel, false, chatPanel, settingsPanel)),
-                toolBtn("📁 Files",   "#d35400", () -> openFolder()),
-                toolBtn("⚙️ Settings","#616a6b", () -> popToggle(settingsPanel, chatPanel, aiPanel))
+                toolBtn("💬 LAN CHAT",     StitchStyles.rgba(StitchStyles.C_PRIMARY, 0.1), StitchStyles.C_PRIMARY, () -> slideToggle(chatPanel, true,  aiPanel, settingsPanel)),
+                toolBtn("🧠 KING AI",      StitchStyles.rgba("#9D5CFF", 0.1), "#9D5CFF", () -> slideToggle(aiPanel, false, chatPanel, settingsPanel)),
+                toolBtn("📂 FILES",        StitchStyles.rgba("#7af19c", 0.1), "#7af19c", () -> openFolder()),
+                toolBtn("⚙ SETTINGS",      StitchStyles.rgba(StitchStyles.C_TEXT_MAIN, 0.05), StitchStyles.C_TEXT_MAIN, () -> popToggle(settingsPanel, chatPanel, aiPanel))
         );
         return toolbar;
     }
 
-    private static Button toolBtn(String text, String color, Runnable action) {
+    private static Button toolBtn(String text, String bgHex, String textHex, Runnable action) {
         Button btn = new Button(text);
         btn.setStyle(
-                "-fx-background-color: " + color + ";" +
-                "-fx-text-fill: white;" +
-                "-fx-font-weight: bold;" +
-                "-fx-background-radius: 22;" +
-                "-fx-padding: 11 26;" +
+                "-fx-background-color: " + bgHex + ";" +
+                "-fx-text-fill: " + textHex + ";" +
+                "-fx-font-weight: 900;" +
+                "-fx-letter-spacing: 0.1em;" +
+                "-fx-font-size: 11px;" +
+                "-fx-background-radius: 20;" +
+                "-fx-padding: 10 24;" +
+                "-fx-border-color: " + StitchStyles.rgba(textHex, 0.2) + ";" +
+                "-fx-border-radius: 20;" +
                 "-fx-cursor: hand;");
         btn.setOnAction(e -> action.run());
-        // Hover scale animation
         btn.setOnMouseEntered(e -> {
             ScaleTransition sc = new ScaleTransition(Duration.millis(120), btn);
-            sc.setToX(1.06); sc.setToY(1.06); sc.play();
+            sc.setToX(1.05); sc.setToY(1.05); sc.play();
+            btn.setStyle(btn.getStyle().replace(bgHex, StitchStyles.rgba(textHex, 0.25)));
         });
         btn.setOnMouseExited(e -> {
             ScaleTransition sc = new ScaleTransition(Duration.millis(120), btn);
             sc.setToX(1.0); sc.setToY(1.0); sc.play();
+            btn.setStyle(btn.getStyle().replace(StitchStyles.rgba(textHex, 0.25), bgHex));
         });
         return btn;
     }
@@ -397,12 +345,12 @@ public class StudentDashboard {
         TranslateTransition bounce = new TranslateTransition(Duration.seconds(1.5), lockEmoji);
         bounce.setByY(-20); bounce.setAutoReverse(true); bounce.setCycleCount(Animation.INDEFINITE);
 
-        Label lockText = new Label("SYSTEM LOCKED");
-        lockText.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 44px; -fx-font-weight: bold;");
-        lockText.setEffect(new DropShadow(18, Color.web("#e74c3c")));
+        Label lockText = new Label("SYSTEM SECURED");
+        lockText.setStyle("-fx-text-fill: " + StitchStyles.C_PRIMARY + "; -fx-font-size: 36px; -fx-font-weight: 900; -fx-letter-spacing: 0.1em;");
+        lockText.setEffect(new DropShadow(18, Color.web(StitchStyles.C_PRIMARY, 0.4)));
 
-        Label lockSub = new Label("Pay attention to your instructor 👨‍🏫");
-        lockSub.setStyle("-fx-text-fill: #888; -fx-font-size: 18px;");
+        Label lockSub = new Label("NODE LOCKED BY ADMINISTRATOR");
+        lockSub.setStyle("-fx-text-fill: " + StitchStyles.rgba(StitchStyles.C_TEXT_MAIN, 0.5) + "; -fx-font-size: 14px; -fx-letter-spacing: 0.25em; -fx-font-weight: 900;");
 
         ov.getChildren().addAll(lockEmoji, lockText, lockSub);
         ov.visibleProperty().addListener((obs, o, n) -> { if (n) bounce.play(); else bounce.stop(); });
@@ -433,18 +381,14 @@ public class StudentDashboard {
         ov.setAlignment(Pos.CENTER);
         ov.setMaxWidth(500);
         ov.setPadding(new Insets(40));
-        ov.setStyle(
-                "-fx-background-color: rgba(18,18,38,0.97);" +
-                "-fx-background-radius: 24;" +
-                "-fx-border-color: rgba(155,89,182,0.5);" +
-                "-fx-border-radius: 24;" +
-                "-fx-border-width: 1.5;");
+        ov.setStyle(StitchStyles.glassPanel(0.85, 24));
+        ov.setEffect(new DropShadow(30, Color.web("#9D5CFF", 0.2)));
         ov.setVisible(false);
 
-        Label pollTitle = new Label("📊 QUICK POLL");
-        pollTitle.setStyle("-fx-text-fill: #c39bd3; -fx-font-size: 18px; -fx-font-weight: bold;");
+        Label pollTitle = new Label("NODE QUERY");
+        pollTitle.setStyle("-fx-text-fill: #9D5CFF; -fx-font-size: 14px; -fx-font-weight: 900; -fx-letter-spacing: 0.2em;");
         pollQuestionLabel = new Label("Question here");
-        pollQuestionLabel.setStyle("-fx-text-fill: white; -fx-font-size: 15px; -fx-wrap-text: true; -fx-text-alignment: center;");
+        pollQuestionLabel.setStyle("-fx-text-fill: " + StitchStyles.C_TEXT_MAIN + "; -fx-font-size: 18px; -fx-font-weight: bold; -fx-wrap-text: true; -fx-text-alignment: center;");
         pollQuestionLabel.setWrapText(true);
         pollQuestionLabel.setMaxWidth(420);
 
@@ -462,15 +406,11 @@ public class StudentDashboard {
         p.setPrefWidth(310);
         p.setMaxWidth(310);
         p.setPadding(new Insets(18));
-        p.setStyle(
-                "-fx-background-color: rgba(10,10,26,0.96);" +
-                "-fx-background-radius: 16 0 0 16;" +
-                "-fx-border-color: rgba(255,255,255,0.06);" +
-                "-fx-border-radius: 16 0 0 16;");
+        p.setStyle(StitchStyles.glassPanel(0.9, 16));
         p.setEffect(new DropShadow(20, Color.BLACK));
 
-        Label title = new Label("💬 LAN CHAT");
-        title.setStyle("-fx-font-size: 15px; -fx-text-fill: #3498db; -fx-font-weight: bold;");
+        Label title = new Label("LAN CHAT");
+        title.setStyle("-fx-font-size: 13px; -fx-text-fill: " + StitchStyles.C_PRIMARY + "; -fx-font-weight: 900; -fx-letter-spacing: 0.15em;");
         Button close = smallCloseBtn(() -> slideOut(p, true));
         HBox hdr = headerRow(title, close);
 
@@ -508,18 +448,14 @@ public class StudentDashboard {
         p.setPrefWidth(380);
         p.setMaxWidth(380);
         p.setPadding(new Insets(18));
-        p.setStyle(
-                "-fx-background-color: rgba(10,10,26,0.96);" +
-                "-fx-background-radius: 0 16 16 0;" +
-                "-fx-border-color: rgba(155,89,182,0.2);" +
-                "-fx-border-radius: 0 16 16 0;");
+        p.setStyle(StitchStyles.glassPanel(0.9, 16));
         p.setEffect(new DropShadow(20, Color.BLACK));
 
-        Label title = new Label("🤖 KING AI");
-        title.setStyle("-fx-font-size: 16px; -fx-text-fill: #9b59b6; -fx-font-weight: bold;");
+        Label title = new Label("KING AI COMMLINK");
+        title.setStyle("-fx-font-size: 13px; -fx-text-fill: #9D5CFF; -fx-font-weight: 900; -fx-letter-spacing: 0.15em;");
         title.setEffect(new Glow(0.5));
-        Label modelLabel = new Label("Model: " + Config.AI_MODEL + "  |  Context: Session");
-        modelLabel.setStyle("-fx-text-fill: #444; -fx-font-size: 9px;");
+        Label modelLabel = new Label("MODEL: " + Config.AI_MODEL.toUpperCase() + "  |  CTX: LOCAL");
+        modelLabel.setStyle("-fx-text-fill: " + StitchStyles.rgba(StitchStyles.C_TEXT_MAIN, 0.4) + "; -fx-font-size: 9px; -fx-font-weight: bold;");
         Button clearBtn = new Button("🗑 Clear");
         clearBtn.setStyle("-fx-background-color: rgba(255,255,255,0.07); -fx-text-fill: #888; -fx-font-size: 10px; -fx-cursor: hand; -fx-background-radius: 6;");
         clearBtn.setOnAction(e -> {
@@ -611,16 +547,12 @@ public class StudentDashboard {
         p.setPrefWidth(440);
         p.setMaxWidth(440);
         p.setPadding(new Insets(30));
-        p.setStyle(
-                "-fx-background-color: rgba(10,10,26,0.98);" +
-                "-fx-background-radius: 20;" +
-                "-fx-border-color: rgba(155,89,182,0.35);" +
-                "-fx-border-radius: 20;");
+        p.setStyle(StitchStyles.glassPanel(0.9, 20));
         p.setEffect(new DropShadow(36, Color.web("#000", 0.7)));
         p.setAlignment(Pos.TOP_CENTER);
 
-        Label title = new Label("⚙️  SETTINGS");
-        title.setStyle("-fx-font-size: 22px; -fx-text-fill: #c39bd3; -fx-font-weight: bold;");
+        Label title = new Label("SYSTEM SETTINGS");
+        title.setStyle("-fx-font-size: 16px; -fx-text-fill: " + StitchStyles.C_TEXT_MAIN + "; -fx-font-weight: 900; -fx-letter-spacing: 0.15em;");
         Button close = smallCloseBtn(() -> popClose(p));
         HBox hdr = headerRow(title, close);
 
@@ -873,36 +805,10 @@ public class StudentDashboard {
     }
 
     // -----------------------------------------------------------------------
-    // THEME APPLICATION
+    // THEME APPLICATION - Deprecated with Stitch Hologram Redesign
     // -----------------------------------------------------------------------
 
-    private static void applyTheme(String key) {
-        currentTheme = key;
-        for (Object[] t : THEMES) {
-            if (t[0].equals(key)) {
-                String imageFile  = (String) t[3];
-                String gradient   = (String) t[2];
-                if (imageFile != null) {
-                    try {
-                        java.net.URL url = StudentDashboard.class.getResource("/themes/" + t[3]);
-                        if (url != null) {
-                            bgImageView.setImage(new Image(url.toString()));
-                            bgImageView.setVisible(true);
-                        } else {
-                            bgImageView.setVisible(false); // fallback if not found
-                        }
-                    } catch (Exception ex) {
-                        bgImageView.setVisible(false);
-                    }
-                    root.setStyle("-fx-background-color: #07070f;");
-                } else {
-                    bgImageView.setImage(null);
-                    root.setStyle("-fx-background-color: linear-gradient(to bottom right, " + gradient + ");");
-                }
-                return;
-            }
-        }
-    }
+    // Legacy theme application logic no longer needed
 
     // -----------------------------------------------------------------------
     // ANIMATIONS (slide-in/out panels)
