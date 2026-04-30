@@ -433,8 +433,7 @@ public class AdminDashboard {
         Label lClass = new Label("CLASS ACCESS"); lClass.setStyle("-fx-text-fill: rgba(223,226,235,0.4); -fx-font-size: 9px; -fx-font-weight: 900; -fx-letter-spacing: 0.25em;");
         HBox hcClass = new HBox(0); hcClass.setStyle(StitchStyles.glassPanel(0.45, 12) + "-fx-padding: 4;");
         Button lockBtn = ribbonPillBtn("🔒 Lock", true); lockBtn.setOnAction(e -> server.broadcast(pkt(CommandPacket.Type.LOCK, "{}")));
-        Button focusBtn = ribbonPillBtn("🎯 Focus", false); focusBtn.setOnAction(e -> server.broadcast(pkt(CommandPacket.Type.UNLOCK, "{}")));
-        hcClass.getChildren().addAll(lockBtn, focusBtn);
+        hcClass.getChildren().addAll(lockBtn);
         bClass.getChildren().addAll(lClass, hcClass);
 
         // Ribbon Block 2: Connectivity

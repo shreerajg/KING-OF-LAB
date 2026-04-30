@@ -565,3 +565,15 @@
 [2026-03-31 00:55:36] [SYSTEM] King Server listening on port 5555
 [2026-03-31 00:55:36] [SYSTEM] Ultra-Binary Stream Server listening on port 5556
 [2026-03-31 00:55:40] [SYSTEM] Admin dashboard closed
+[2026-05-01 02:59:50] [SYSTEM] King of Lab v3.0 started
+[2026-05-01 02:59:50] [SYSTEM] Database initialised
+[2026-05-01 03:12:40] [LOGIN] admin logged in successfully
+[2026-05-01 03:12:40] [SYSTEM] King of Lab Admin started
+[2026-05-01 03:12:40] [SYSTEM] King Server listening on port 5555
+[2026-05-01 03:12:40] [SYSTEM] Ultra-Binary Stream Server listening on port 5556
+[2026-05-01 03:12:40] [CONNECT] Student connected: shree (Roll:73 SYA)
+[2026-05-01 03:13:50] [COMMAND] admin → ALL: AI_TOGGLE → ENABLE
+[2026-05-01 03:15:44] [SYSTEM] Stream Mode switched to ULTRA_WEBRTC
+[2026-05-01 03:16:00] [SYSTEM] Stream Mode switched to LEGACY_CPU
+[2026-05-01 03:16:06] [SYSTEM] Stream Mode switched to ULTRA_WEBRTC
+[2026-05-01 03:16:13] [COMMAND] admin → ALL: AI_TOGGLE → DISABLE

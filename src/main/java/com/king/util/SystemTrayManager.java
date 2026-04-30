@@ -40,12 +40,17 @@ public class SystemTrayManager {
         try {
             tray = SystemTray.getSystemTray();
 
-            // Create tray icon (using a simple image)
-            Image image = Toolkit.getDefaultToolkit().createImage(
-                    SystemTrayManager.class.getResource("/king_icon.png"));
-
-            // Fallback: Create a simple colored icon if image not found
-            if (image == null || image.getWidth(null) <= 0) {
+            // Create tray icon — guard against missing resource (NPE in AWT fetcher)
+            java.net.URL iconUrl = SystemTrayManager.class.getResource("/king_icon.png");
+            Image image;
+            if (iconUrl != null) {
+                image = Toolkit.getDefaultToolkit().createImage(iconUrl);
+                // If AWT returned a stub with invalid dimensions, fall back
+                if (image == null || image.getWidth(null) <= 0) {
+                    image = createDefaultIcon();
+                }
+            } else {
+                // Resource not found — use the programmatically drawn icon
                 image = createDefaultIcon();
             }
 

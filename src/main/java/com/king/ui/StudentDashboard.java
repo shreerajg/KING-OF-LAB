@@ -42,7 +42,6 @@ public class StudentDashboard {
     private static DiscoveryService discoveryService;
 
     private static StackPane  root;
-    private static VBox       lockOverlay;
     private static VBox       focusOverlay;
     private static VBox       pollOverlay;
     private static ImageView  streamView;
@@ -61,6 +60,7 @@ public class StudentDashboard {
     private static String downloadFolder = System.getProperty("user.home") + "/Downloads/KingLab";
     private static boolean handRaised = false;
     private static Button  raiseHandBtn;
+    private static long    lastFrameTime = 0;
 
     // -----------------------------------------------------------------------
     // SHOW
@@ -120,9 +120,8 @@ public class StudentDashboard {
         StackPane.setMargin(notificationLabel, new Insets(12, 0, 0, 0));
         root.getChildren().add(notificationLabel);
 
-        // ===== LOCK OVERLAY =====
-        lockOverlay = buildLockOverlay();
-        root.getChildren().add(lockOverlay);
+        // lockOverlay removed in favor of native OS lock
+
 
         // ===== FOCUS MODE OVERLAY =====
         focusOverlay = buildFocusOverlay();
@@ -160,6 +159,7 @@ public class StudentDashboard {
 
         SystemTrayManager.init(stage, "STUDENT", user);
         stage.setOnCloseRequest(e -> { e.consume(); SystemTrayManager.hideWindow(); });
+        startStaleStreamMonitor();
         stage.show();
     }
 
@@ -333,29 +333,7 @@ public class StudentDashboard {
     // OVERLAYS
     // -----------------------------------------------------------------------
 
-    private static VBox buildLockOverlay() {
-        VBox ov = new VBox(20);
-        ov.setAlignment(Pos.CENTER);
-        ov.setStyle("-fx-background-color: rgba(0,0,0,0.97);");
-        ov.setVisible(false);
 
-        Label lockEmoji = new Label("🔒");
-        lockEmoji.setStyle("-fx-font-size: 80px;");
-        // Bounce lock icon
-        TranslateTransition bounce = new TranslateTransition(Duration.seconds(1.5), lockEmoji);
-        bounce.setByY(-20); bounce.setAutoReverse(true); bounce.setCycleCount(Animation.INDEFINITE);
-
-        Label lockText = new Label("SYSTEM SECURED");
-        lockText.setStyle("-fx-text-fill: " + StitchStyles.C_PRIMARY + "; -fx-font-size: 36px; -fx-font-weight: 900; -fx-letter-spacing: 0.1em;");
-        lockText.setEffect(new DropShadow(18, Color.web(StitchStyles.C_PRIMARY, 0.4)));
-
-        Label lockSub = new Label("NODE LOCKED BY ADMINISTRATOR");
-        lockSub.setStyle("-fx-text-fill: " + StitchStyles.rgba(StitchStyles.C_TEXT_MAIN, 0.5) + "; -fx-font-size: 14px; -fx-letter-spacing: 0.25em; -fx-font-weight: 900;");
-
-        ov.getChildren().addAll(lockEmoji, lockText, lockSub);
-        ov.visibleProperty().addListener((obs, o, n) -> { if (n) bounce.play(); else bounce.stop(); });
-        return ov;
-    }
 
     private static VBox buildFocusOverlay() {
         VBox ov = new VBox(16);
@@ -598,13 +576,15 @@ public class StudentDashboard {
         Platform.runLater(() -> {
             switch (packet.getType()) {
                 case LOCK:
-                    lockOverlay.setVisible(true);
-                    lockOverlay.toFront();
-                    showNotification("🔒 Screen locked by instructor");
+                    try {
+                        Runtime.getRuntime().exec("rundll32.exe user32.dll,LockWorkStation");
+                        showNotification("🔒 System locked by instructor");
+                    } catch (Exception ex) {
+                        AuditLogger.logError("LOCK_CMD", ex.getMessage());
+                    }
                     break;
                 case UNLOCK:
-                    lockOverlay.setVisible(false);
-                    showNotification("🔓 Screen unlocked");
+                    showNotification("🔓 System release signal received");
                     break;
                 case FOCUS_MODE:
                     boolean focusOn = "ON".equals(packet.getPayload());
@@ -639,13 +619,44 @@ public class StudentDashboard {
                     if (!chatPanel.isVisible()) showNotification("💬 " + packet.getSender() + ": " + packet.getPayload());
                     break;
                 case ADMIN_SCREEN:
-                    try {
-                        byte[] b = Base64.getDecoder().decode(packet.getPayload());
-                        Image img = new Image(new ByteArrayInputStream(b));
-                        streamView.setImage(img);
-                        javafx.scene.Node wb = root.lookup("#waitBox");
-                        if (wb != null) wb.setVisible(false);
-                    } catch (Exception ex) { AuditLogger.logError("ADMIN_SCREEN", ex.getMessage()); }
+                    // Decode off the FX thread so the UI render loop is never blocked.
+                    // 1) Grab the payload while still on the FX thread (cheap String copy)
+                    final String screenPayload = packet.getPayload();
+                    if (screenPayload == null || screenPayload.isEmpty()) break;
+                    Thread decodeThread = new Thread(() -> {
+                        try {
+                            lastFrameTime = System.currentTimeMillis();
+                            byte[] b = Base64.getDecoder().decode(screenPayload);
+                            // Decode JPEG to BufferedImage on the background thread
+                            java.awt.image.BufferedImage bi =
+                                    javax.imageio.ImageIO.read(new ByteArrayInputStream(b));
+                            if (bi == null) return;
+                            int w = bi.getWidth(), h = bi.getHeight();
+                            int[] pixels = new int[w * h];
+                            bi.getRGB(0, 0, w, h, pixels, 0, w);
+                            // Build a WritableImage and swap on the FX thread (paint only, no decode)
+                            Platform.runLater(() -> {
+                                try {
+                                    javafx.scene.image.WritableImage wi =
+                                            new javafx.scene.image.WritableImage(w, h);
+                                    javafx.scene.image.PixelWriter pw = wi.getPixelWriter();
+                                    pw.setPixels(0, 0, w, h,
+                                            javafx.scene.image.PixelFormat.getIntArgbInstance(),
+                                            pixels, 0, w);
+                                    streamView.setImage(wi);
+                                    javafx.scene.Node wb = root.lookup("#waitBox");
+                                    if (wb != null) wb.setVisible(false);
+                                } catch (Exception ex) {
+                                    AuditLogger.logError("ADMIN_SCREEN_FX", ex.getMessage());
+                                }
+                            });
+                        } catch (Exception ex) {
+                            AuditLogger.logError("ADMIN_SCREEN", ex.getMessage());
+                        }
+                    }, "ScreenDecoder");
+                    decodeThread.setDaemon(true);
+                    decodeThread.setPriority(Thread.NORM_PRIORITY - 1);
+                    decodeThread.start();
                     break;
                 case FILE_DATA:
                     try {
@@ -702,6 +713,25 @@ public class StudentDashboard {
                     break;
             }
         });
+    }
+
+    // -----------------------------------------------------------------------
+    // STALE STREAM MONITOR
+    // -----------------------------------------------------------------------
+
+    private static void startStaleStreamMonitor() {
+        Timeline monitor = new Timeline(new KeyFrame(Duration.seconds(1), e -> {
+            if (lastFrameTime > 0 && (System.currentTimeMillis() - lastFrameTime > 2000)) {
+                if (streamView != null && streamView.getImage() != null) {
+                    streamView.setImage(null);
+                    javafx.scene.Node wb = root.lookup("#waitBox");
+                    if (wb != null) wb.setVisible(true);
+                    lastFrameTime = 0; // Reset
+                }
+            }
+        }));
+        monitor.setCycleCount(Animation.INDEFINITE);
+        monitor.play();
     }
 
     // -----------------------------------------------------------------------
