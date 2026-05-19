@@ -109,9 +109,7 @@ public class AttendanceTracker {
 
                         }
                     }
-                } catch (IOException e) {
-                    System.err.println("[Attendance] Failed to read existing CSV: " + e.getMessage());
-                }
+}
             }
 
             // 2. Merge with current in-memory map
