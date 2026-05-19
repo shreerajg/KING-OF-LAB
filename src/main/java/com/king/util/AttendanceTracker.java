@@ -104,9 +104,9 @@ public class AttendanceTracker {
                                 oldAtt.setFirstConnected(fc);
                                 oldAtt.setLastSeen(ls);
                                 mergedStudents.put(user, oldAtt);
-                            } catch (Exception e) {
+} catch (Exception e) {
                                 // Ignore parse errors for a single line
-
+                            }
                         }
                     }
                 } catch (IOException e) {
