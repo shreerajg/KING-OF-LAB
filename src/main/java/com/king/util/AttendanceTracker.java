@@ -46,8 +46,7 @@ public class AttendanceTracker {
             attendance.setSessionLeaveTime(LocalDateTime.now());
             attendance.updateLastSeen();
         }
-    }
-    }
+}
 
     /**
      * Generate attendance CSV files grouped by class-division
@@ -175,4 +174,5 @@ public class AttendanceTracker {
     public static int getTotalStudents() {
         return attendanceMap.size();
     }
+}
 }
