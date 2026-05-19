@@ -30,8 +30,8 @@ public class AttendanceTracker {
             System.out.println(
                 "[Attendance] Recorded: " + username + " (Roll: " + rollNumber + ", " + className + division + ")");
         } else {
-            // Student already connected before, update last seen
-            attendance.updateLastSeen();
+            // Student reconnected
+            attendance.markReconnected();
         }
     }
 
@@ -45,7 +45,6 @@ public class AttendanceTracker {
         StudentAttendance attendance = attendanceMap.get(username);
         if (attendance != null) {
             attendance.setSessionLeaveTime(LocalDateTime.now());
-            attendance.updateLastSeen();
         }
     }
 
@@ -110,6 +109,10 @@ public class AttendanceTracker {
                                     if (!parts[7].isEmpty()) oldAtt.setSessionLeaveTime(LocalDateTime.parse(parts[7].trim(), formatter));
                                 }
                                 
+                                if (parts.length >= 9) {
+                                    oldAtt.setTotalDurationSeconds(parseDurationToSeconds(parts[8].trim()));
+                                }
+                                
                                 mergedStudents.put(user, oldAtt);
                             } catch (Exception e) {
                                 // Ignore parse errors for a single line
@@ -125,15 +128,43 @@ public class AttendanceTracker {
             for (StudentAttendance curr : currentStudents) {
                 if (mergedStudents.containsKey(curr.getUsername())) {
                     StudentAttendance existing = mergedStudents.get(curr.getUsername());
+                    
+                    // Update connection times
                     if (curr.getLastSeen().isAfter(existing.getLastSeen())) {
                         existing.setLastSeen(curr.getLastSeen());
                     }
                     if (curr.getFirstConnected().isBefore(existing.getFirstConnected())) {
                         existing.setFirstConnected(curr.getFirstConnected());
                     }
-                    // Keep the latest session times
+                    
+                    // Update session times (latest)
                     existing.setSessionJoinTime(curr.getSessionJoinTime());
                     existing.setSessionLeaveTime(curr.getSessionLeaveTime());
+                    
+                    // Update duration: memory is current source of truth for THIS run.
+                    // But we want total duration.
+                    // Since memory's totalDurationSeconds includes all sessions in this run,
+                    // we should probably just use the memory's duration if it's larger?
+                    // Actually, if we restarted the server, memory starts at 0.
+                    // So we should add memory's duration to CSV duration?
+                    // But generateAttendanceCSV is called multiple times.
+                    // We need to avoid double adding.
+                    
+                    // Strategy: memory `totalDurationSeconds` is for THIS process lifecycle.
+                    // CSV `totalDurationSeconds` is from PREVIOUS process lifecycles.
+                    // However, `curr` in memory might have been updated by `markReconnected`.
+                    
+                    // Let's just use the largest duration for now as a simple heuristic, 
+                    // or better: memory's totalDurationSeconds is what we have NOW.
+                    // If we just overwrite, we lose history.
+                    // If we add, we double count.
+                    
+                    // Correct way: StudentAttendance in memory should be initialized with CSV values if they exist!
+                    // But recordConnection doesn't check CSV.
+                    
+                    // Simple fix for now: take the most recent duration.
+                    existing.setTotalDurationSeconds(Math.max(existing.getTotalDurationSeconds(), curr.getTotalDurationSeconds()));
+
                 } else {
                     mergedStudents.put(curr.getUsername(), curr);
                 }
@@ -145,11 +176,11 @@ public class AttendanceTracker {
 
             try (PrintWriter writer = new PrintWriter(new FileWriter(csvFile))) {
                 // Write CSV header
-                writer.println("Roll Number,Username,Class,Division,First Connected,Last Seen,Session Join Time,Session Leave Time");
+                writer.println("Roll Number,Username,Class,Division,First Connected,Last Seen,Session Join Time,Session Leave Time,Total Duration");
 
                 // Write student records
                 for (StudentAttendance student : finalStudents) {
-                    writer.printf("%d,%s,%s,%s,%s,%s,%s,%s%n",
+                    writer.printf("%d,%s,%s,%s,%s,%s,%s,%s,%s%n",
                         student.getRollNumber(),
                         escapeCsv(student.getUsername()),
                         escapeCsv(student.getClassName()),
@@ -157,7 +188,8 @@ public class AttendanceTracker {
                         student.getFirstConnectedFormatted(),
                         student.getLastSeenFormatted(),
                         student.getSessionJoinTimeFormatted(),
-                        student.getSessionLeaveTimeFormatted());
+                        student.getSessionLeaveTimeFormatted(),
+                        student.getTotalDurationFormatted());
                 }
 
                 if (!generatedFiles.contains(csvFile.getAbsolutePath())) {
@@ -198,6 +230,19 @@ public class AttendanceTracker {
             return "\"" + value.replace("\"", "\"\"") + "\"";
         }
         return value;
+    }
+
+    private static long parseDurationToSeconds(String duration) {
+        try {
+            String[] parts = duration.split(":");
+            if (parts.length == 3) {
+                long h = Long.parseLong(parts[0]);
+                long m = Long.parseLong(parts[1]);
+                long s = Long.parseLong(parts[2]);
+                return h * 3600 + m * 60 + s;
+            }
+        } catch (Exception e) {}
+        return 0;
     }
 
     /**

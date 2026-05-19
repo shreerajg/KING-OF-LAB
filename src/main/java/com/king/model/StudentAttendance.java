@@ -1,5 +1,6 @@
 package com.king.model;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -15,6 +16,8 @@ public class StudentAttendance {
     private LocalDateTime lastSeen;
     private LocalDateTime sessionJoinTime;
     private LocalDateTime sessionLeaveTime;
+    private long totalDurationSeconds = 0;
+    private LocalDateTime lastJoinTime;
 
     public StudentAttendance(String username, int rollNumber, String className, String division) {
         this.username = username;
@@ -25,6 +28,7 @@ public class StudentAttendance {
         this.firstConnected = now;
         this.lastSeen = now;
         this.sessionJoinTime = now;
+        this.lastJoinTime = now;
         this.sessionLeaveTime = null;
     }
 
@@ -42,10 +46,42 @@ public class StudentAttendance {
 
     public void setSessionJoinTime(LocalDateTime sessionJoinTime) {
         this.sessionJoinTime = sessionJoinTime;
+        this.lastJoinTime = sessionJoinTime;
     }
 
     public void setSessionLeaveTime(LocalDateTime sessionLeaveTime) {
         this.sessionLeaveTime = sessionLeaveTime;
+        if (lastJoinTime != null && sessionLeaveTime != null) {
+            this.totalDurationSeconds += Duration.between(lastJoinTime, sessionLeaveTime).getSeconds();
+            this.lastJoinTime = null;
+        }
+    }
+
+    public void markReconnected() {
+        this.lastJoinTime = LocalDateTime.now();
+        this.sessionJoinTime = this.lastJoinTime;
+        this.sessionLeaveTime = null;
+        updateLastSeen();
+    }
+
+    public long getTotalDurationSeconds() {
+        long currentSessionSeconds = 0;
+        if (lastJoinTime != null) {
+            currentSessionSeconds = Duration.between(lastJoinTime, LocalDateTime.now()).getSeconds();
+        }
+        return totalDurationSeconds + currentSessionSeconds;
+    }
+
+    public String getTotalDurationFormatted() {
+        long totalSeconds = getTotalDurationSeconds();
+        long hours = totalSeconds / 3600;
+        long minutes = (totalSeconds % 3600) / 60;
+        long seconds = totalSeconds % 60;
+        return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+    }
+
+    public void setTotalDurationSeconds(long totalDurationSeconds) {
+        this.totalDurationSeconds = totalDurationSeconds;
     }
 
     public LocalDateTime getSessionJoinTime() {
