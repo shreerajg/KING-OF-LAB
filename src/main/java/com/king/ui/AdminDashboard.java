@@ -363,7 +363,26 @@ public class AdminDashboard {
         aiToggleBtn = buildSideAction("🧠", "AI COMMAND", false);
         aiToggleBtn.setOnAction(e -> toggleAi(user.getUsername()));
 
-        navMenu.getChildren().addAll(navClass, navNet, navPower, aiToggleBtn);
+        Button navAttendance = buildSideAction("📋", "ATTENDANCE", false);
+        navAttendance.setOnAction(e -> {
+            List<String> files = AttendanceTracker.generateAttendanceCSV();
+            if (files.isEmpty()) {
+                appendActivity("ATTENDANCE", "No records to export", C_WARNING);
+            } else {
+                appendActivity("ATTENDANCE", "Exported " + files.size() + " files", C_SUCCESS);
+                // Try to open the directory
+                try {
+                    File dir = new File(System.getProperty("user.home"), "King Attendance");
+                    if (Desktop.isDesktopSupported()) {
+                        Desktop.getDesktop().open(dir);
+                    }
+                } catch (Exception ex) {
+                    appendActivity("ERROR", "Could not open folder", C_DANGER);
+                }
+            }
+        });
+
+        navMenu.getChildren().addAll(navClass, navNet, navPower, aiToggleBtn, navAttendance);
         
         Region spacer = new Region(); VBox.setVgrow(spacer, Priority.ALWAYS);
 

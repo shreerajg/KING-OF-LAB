@@ -13,6 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class AttendanceTracker {
     private static final Map<String, StudentAttendance> attendanceMap = new ConcurrentHashMap<>();
+    private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     /**
      * Record a student connection
@@ -46,7 +47,7 @@ public class AttendanceTracker {
             attendance.setSessionLeaveTime(LocalDateTime.now());
             attendance.updateLastSeen();
         }
-}
+    }
 
     /**
      * Generate attendance CSV files grouped by class-division
@@ -60,7 +61,9 @@ public class AttendanceTracker {
 
         // Create attendance directory
         File attendanceDir = new File(System.getProperty("user.home"), "King Attendance");
-        attendanceDir.mkdirs();
+        if (!attendanceDir.exists()) {
+            attendanceDir.mkdirs();
+        }
 
         String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 
@@ -68,8 +71,7 @@ public class AttendanceTracker {
         Map<String, List<StudentAttendance>> groupedByClass = new HashMap<>();
         for (StudentAttendance attendance : attendanceMap.values()) {
             String key = attendance.getClassDivision();
-            groupedByClass.putIfAbsent(key, new ArrayList<>());
-            groupedByClass.get(key).add(attendance);
+            groupedByClass.computeIfAbsent(key, k -> new ArrayList<>()).add(attendance);
         }
 
         List<String> generatedFiles = new ArrayList<>();
@@ -89,26 +91,34 @@ public class AttendanceTracker {
                 try (BufferedReader reader = new BufferedReader(new FileReader(csvFile))) {
                     String line = reader.readLine(); // skip header
                     while ((line = reader.readLine()) != null) {
-                        String[] parts = line.split(",");
+                        String[] parts = parseCsvLine(line);
                         if (parts.length >= 6) {
                             try {
                                 int roll = Integer.parseInt(parts[0].trim());
                                 String user = parts[1].trim();
                                 String cl = parts[2].trim();
                                 String div = parts[3].trim();
-                                LocalDateTime fc = LocalDateTime.parse(parts[4].trim(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-                                LocalDateTime ls = LocalDateTime.parse(parts[5].trim(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                                LocalDateTime fc = LocalDateTime.parse(parts[4].trim(), formatter);
+                                LocalDateTime ls = LocalDateTime.parse(parts[5].trim(), formatter);
                                 
                                 StudentAttendance oldAtt = new StudentAttendance(user, roll, cl, div);
                                 oldAtt.setFirstConnected(fc);
                                 oldAtt.setLastSeen(ls);
+                                
+                                if (parts.length >= 8) {
+                                    if (!parts[6].isEmpty()) oldAtt.setSessionJoinTime(LocalDateTime.parse(parts[6].trim(), formatter));
+                                    if (!parts[7].isEmpty()) oldAtt.setSessionLeaveTime(LocalDateTime.parse(parts[7].trim(), formatter));
+                                }
+                                
                                 mergedStudents.put(user, oldAtt);
-} catch (Exception e) {
+                            } catch (Exception e) {
                                 // Ignore parse errors for a single line
-
+                            }
                         }
                     }
-}
+                } catch (IOException e) {
+                    System.err.println("[Attendance] Error reading existing CSV: " + e.getMessage());
+                }
             }
 
             // 2. Merge with current in-memory map
@@ -121,6 +131,9 @@ public class AttendanceTracker {
                     if (curr.getFirstConnected().isBefore(existing.getFirstConnected())) {
                         existing.setFirstConnected(curr.getFirstConnected());
                     }
+                    // Keep the latest session times
+                    existing.setSessionJoinTime(curr.getSessionJoinTime());
+                    existing.setSessionLeaveTime(curr.getSessionLeaveTime());
                 } else {
                     mergedStudents.put(curr.getUsername(), curr);
                 }
@@ -131,21 +144,21 @@ public class AttendanceTracker {
             finalStudents.sort(Comparator.comparingInt(StudentAttendance::getRollNumber));
 
             try (PrintWriter writer = new PrintWriter(new FileWriter(csvFile))) {
-    // Write CSV header
-    writer.println("Roll Number,Username,Class,Division,First Connected,Last Seen,Session Join Time,Session Leave Time");
+                // Write CSV header
+                writer.println("Roll Number,Username,Class,Division,First Connected,Last Seen,Session Join Time,Session Leave Time");
 
-    // Write student records
-    for (StudentAttendance student : finalStudents) {
-        writer.printf("%d,%s,%s,%s,%s,%s,%s,%s%n",
-            student.getRollNumber(),
-            student.getUsername(),
-            student.getClassName(),
-            student.getDivision(),
-            student.getFirstConnectedFormatted(),
-            student.getLastSeenFormatted(),
-            student.getSessionJoinTimeFormatted(),
-            student.getSessionLeaveTimeFormatted());
-    }
+                // Write student records
+                for (StudentAttendance student : finalStudents) {
+                    writer.printf("%d,%s,%s,%s,%s,%s,%s,%s%n",
+                        student.getRollNumber(),
+                        escapeCsv(student.getUsername()),
+                        escapeCsv(student.getClassName()),
+                        escapeCsv(student.getDivision()),
+                        student.getFirstConnectedFormatted(),
+                        student.getLastSeenFormatted(),
+                        student.getSessionJoinTimeFormatted(),
+                        student.getSessionLeaveTimeFormatted());
+                }
 
                 if (!generatedFiles.contains(csvFile.getAbsolutePath())) {
                     generatedFiles.add(csvFile.getAbsolutePath());
@@ -159,6 +172,32 @@ public class AttendanceTracker {
         }
 
         return generatedFiles;
+    }
+
+    private static String[] parseCsvLine(String line) {
+        List<String> result = new ArrayList<>();
+        boolean inQuotes = false;
+        StringBuilder sb = new StringBuilder();
+        for (char c : line.toCharArray()) {
+            if (c == '\"') {
+                inQuotes = !inQuotes;
+            } else if (c == ',' && !inQuotes) {
+                result.add(sb.toString());
+                sb.setLength(0);
+            } else {
+                sb.append(c);
+            }
+        }
+        result.add(sb.toString());
+        return result.toArray(new String[0]);
+    }
+
+    private static String escapeCsv(String value) {
+        if (value == null) return "";
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 
     /**
