@@ -27,11 +27,26 @@ public class AttendanceTracker {
             attendance = new StudentAttendance(username, rollNumber, className, division);
             attendanceMap.put(username, attendance);
             System.out.println(
-                    "[Attendance] Recorded: " + username + " (Roll: " + rollNumber + ", " + className + division + ")");
+                "[Attendance] Recorded: " + username + " (Roll: " + rollNumber + ", " + className + division + ")");
         } else {
             // Student already connected before, update last seen
             attendance.updateLastSeen();
         }
+    }
+
+    /**
+     * Record a student disconnection
+     */
+    public static void recordDisconnection(String username) {
+        if (username == null || username.isEmpty())
+            return;
+
+        StudentAttendance attendance = attendanceMap.get(username);
+        if (attendance != null) {
+            attendance.setSessionLeaveTime(LocalDateTime.now());
+            attendance.updateLastSeen();
+        }
+    }
     }
 
     /**
@@ -119,19 +134,21 @@ public class AttendanceTracker {
             finalStudents.sort(Comparator.comparingInt(StudentAttendance::getRollNumber));
 
             try (PrintWriter writer = new PrintWriter(new FileWriter(csvFile))) {
-                // Write CSV header
-                writer.println("Roll Number,Username,Class,Division,First Connected,Last Seen");
+    // Write CSV header
+    writer.println("Roll Number,Username,Class,Division,First Connected,Last Seen,Session Join Time,Session Leave Time");
 
-                // Write student records
-                for (StudentAttendance student : finalStudents) {
-                    writer.printf("%d,%s,%s,%s,%s,%s%n",
-                            student.getRollNumber(),
-                            student.getUsername(),
-                            student.getClassName(),
-                            student.getDivision(),
-                            student.getFirstConnectedFormatted(),
-                            student.getLastSeenFormatted());
-                }
+    // Write student records
+    for (StudentAttendance student : finalStudents) {
+        writer.printf("%d,%s,%s,%s,%s,%s,%s,%s%n",
+            student.getRollNumber(),
+            student.getUsername(),
+            student.getClassName(),
+            student.getDivision(),
+            student.getFirstConnectedFormatted(),
+            student.getLastSeenFormatted(),
+            student.getSessionJoinTimeFormatted(),
+            student.getSessionLeaveTimeFormatted());
+    }
 
                 if (!generatedFiles.contains(csvFile.getAbsolutePath())) {
                     generatedFiles.add(csvFile.getAbsolutePath());
