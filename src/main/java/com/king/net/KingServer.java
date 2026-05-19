@@ -403,6 +403,9 @@ public class KingServer {
         private void cleanup() {
             clients.remove(this);
             clientsByName.remove(clientName);
+            if (clientName != null && !"Unknown".equals(clientName)) {
+                com.king.util.AttendanceTracker.recordDisconnection(clientName);
+            }
             AuditLogger.logDisconnect(clientName);
             if (statusListener != null && registered) {
                 statusListener.onClientDisconnected(clientName);
