@@ -13,14 +13,19 @@ public class StudentAttendance {
     private String division;
     private LocalDateTime firstConnected;
     private LocalDateTime lastSeen;
+    private LocalDateTime sessionJoinTime;
+    private LocalDateTime sessionLeaveTime;
 
     public StudentAttendance(String username, int rollNumber, String className, String division) {
         this.username = username;
         this.rollNumber = rollNumber;
         this.className = className != null ? className.trim().toUpperCase() : "";
         this.division = division != null ? division.trim().toUpperCase() : "";
-        this.firstConnected = LocalDateTime.now();
-        this.lastSeen = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
+        this.firstConnected = now;
+        this.lastSeen = now;
+        this.sessionJoinTime = now;
+        this.sessionLeaveTime = null;
     }
 
     public void setFirstConnected(LocalDateTime firstConnected) {
@@ -33,6 +38,30 @@ public class StudentAttendance {
 
     public void updateLastSeen() {
         this.lastSeen = LocalDateTime.now();
+    }
+
+    public void setSessionJoinTime(LocalDateTime sessionJoinTime) {
+        this.sessionJoinTime = sessionJoinTime;
+    }
+
+    public void setSessionLeaveTime(LocalDateTime sessionLeaveTime) {
+        this.sessionLeaveTime = sessionLeaveTime;
+    }
+
+    public LocalDateTime getSessionJoinTime() {
+        return sessionJoinTime;
+    }
+
+    public LocalDateTime getSessionLeaveTime() {
+        return sessionLeaveTime;
+    }
+
+    public String getSessionJoinTimeFormatted() {
+        return sessionJoinTime != null ? sessionJoinTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) : "";
+    }
+
+    public String getSessionLeaveTimeFormatted() {
+        return sessionLeaveTime != null ? sessionLeaveTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) : "";
     }
 
     // Getters
