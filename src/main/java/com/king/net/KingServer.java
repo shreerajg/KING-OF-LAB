@@ -13,17 +13,19 @@ import javafx.application.Platform;
  * King of Lab — upgraded KingServer.
  *
  * Features:
- *  - Heartbeat watchdog: marks clients offline after Config.HEARTBEAT_TIMEOUT_SEC
- *  - Audit logging on connect / disconnect / command
- *  - Thread-safe client map (ConcurrentHashMap)
- *  - Sends HEARTBEAT_ACK response to clients
+ * - Heartbeat watchdog: marks clients offline after
+ * Config.HEARTBEAT_TIMEOUT_SEC
+ * - Audit logging on connect / disconnect / command
+ * - Thread-safe client map (ConcurrentHashMap)
+ * - Sends HEARTBEAT_ACK response to clients
  */
 public class KingServer {
 
     private ServerSocket serverSocket;
     private volatile boolean running = false;
 
-    // Use ConcurrentHashMap for thread-safe access without synchronisation on every read
+    // Use ConcurrentHashMap for thread-safe access without synchronisation on every
+    // read
     private final ConcurrentHashMap<String, ClientHandler> clientsByName = new ConcurrentHashMap<>();
     private final List<ClientHandler> clients = Collections.synchronizedList(new ArrayList<>());
 
@@ -49,11 +51,14 @@ public class KingServer {
 
     public interface ScreenUpdateListener {
         void onScreenUpdate(String clientName, String base64Image);
-        default void onShellOutput(String clientName, String output) {}
+
+        default void onShellOutput(String clientName, String output) {
+        }
     }
 
     public interface ClientStatusListener {
         void onClientConnected(String clientName);
+
         void onClientDisconnected(String clientName);
     }
 
@@ -64,9 +69,17 @@ public class KingServer {
         void onExtendedPacket(CommandPacket.Type type, String sender, String payload);
     }
 
-    public void setScreenListener(ScreenUpdateListener l)    { this.screenListener    = l; }
-    public void setStatusListener(ClientStatusListener l)     { this.statusListener    = l; }
-    public void setExtendedListener(ExtendedListener l)       { this.extendedListener  = l; }
+    public void setScreenListener(ScreenUpdateListener l) {
+        this.screenListener = l;
+    }
+
+    public void setStatusListener(ClientStatusListener l) {
+        this.statusListener = l;
+    }
+
+    public void setExtendedListener(ExtendedListener l) {
+        this.extendedListener = l;
+    }
 
     // -----------------------------------------------------------------------
     // Start / Stop
@@ -93,7 +106,8 @@ public class KingServer {
                         clients.add(handler);
                         pool.execute(handler);
                     } catch (IOException e) {
-                        if (running) AuditLogger.logError("KingServer.accept", e.getMessage());
+                        if (running)
+                            AuditLogger.logError("KingServer.accept", e.getMessage());
                     }
                 }
             } catch (IOException e) {
@@ -105,7 +119,11 @@ public class KingServer {
     public void stop() {
         running = false;
         scheduler.shutdownNow();
-        try { if (serverSocket != null) serverSocket.close(); } catch (IOException ignored) {}
+        try {
+            if (serverSocket != null)
+                serverSocket.close();
+        } catch (IOException ignored) {
+        }
         pool.shutdownNow();
     }
 
@@ -147,18 +165,25 @@ public class KingServer {
         String json = gson.toJson(packet);
         synchronized (clients) {
             for (ClientHandler c : clients) {
-                if (c != sender) c.send(json);
+                if (c != sender)
+                    c.send(json);
             }
         }
     }
 
     public void sendToClient(String clientName, CommandPacket packet) {
         ClientHandler handler = clientsByName.get(clientName);
-        if (handler != null) handler.send(gson.toJson(packet));
+        if (handler != null)
+            handler.send(gson.toJson(packet));
     }
 
-    public List<String> getConnectedClients() { return new ArrayList<>(clientsByName.keySet()); }
-    public int getClientCount()               { return clientsByName.size(); }
+    public List<String> getConnectedClients() {
+        return new ArrayList<>(clientsByName.keySet());
+    }
+
+    public int getClientCount() {
+        return clientsByName.size();
+    }
 
     private void startBinaryStreamServer() {
         new Thread(() -> {
@@ -184,11 +209,11 @@ public class KingServer {
      */
     private void handleBinaryStream(Socket socket) {
         // Ref holds the latest received payload for this connection
-        java.util.concurrent.atomic.AtomicReference<byte[]> latestPayload =
-                new java.util.concurrent.atomic.AtomicReference<>(null);
+        java.util.concurrent.atomic.AtomicReference<byte[]> latestPayload = new java.util.concurrent.atomic.AtomicReference<>(
+                null);
         // Name discovered from first packet
-        java.util.concurrent.atomic.AtomicReference<String> clientNameRef =
-                new java.util.concurrent.atomic.AtomicReference<>("?");
+        java.util.concurrent.atomic.AtomicReference<String> clientNameRef = new java.util.concurrent.atomic.AtomicReference<>(
+                "?");
 
         // ── 30 FPS Dispatch thread ─────────────────────────────────────────
         // Runs alongside the reader; always dispatches only the LATEST frame.
@@ -199,17 +224,18 @@ public class KingServer {
                 try {
                     byte[] payload = latestPayload.getAndSet(null);
                     if (payload != null) {
-                        final String name   = clientNameRef.get();
+                        final String name = clientNameRef.get();
                         final byte[] pBytes = payload;
                         // Decode on render thread — Image constructor is non-blocking for byte[]
                         Platform.runLater(() -> {
                             try {
-                                javafx.scene.image.Image image =
-                                    new javafx.scene.image.Image(new ByteArrayInputStream(pBytes));
+                                javafx.scene.image.Image image = new javafx.scene.image.Image(
+                                        new ByteArrayInputStream(pBytes));
                                 if (screenListener instanceof BinaryScreenListener) {
                                     ((BinaryScreenListener) screenListener).onBinaryUpdate(name, image);
                                 }
-                            } catch (Exception ignored) {}
+                            } catch (Exception ignored) {
+                            }
                         });
                     }
                     Thread.sleep(33); // ~30 FPS UI cap — prevents JavaFX queue saturation
@@ -226,7 +252,8 @@ public class KingServer {
         // (frame-drop: consumer always gets the freshest data).
         try (DataInputStream dis = new DataInputStream(new BufferedInputStream(socket.getInputStream(), 256_000))) {
             while (running && !socket.isClosed()) {
-                // Header: [Name Length (int)][Name (UTF-8 bytes)][Payload Length (int)][Payload (bytes)]
+                // Header: [Name Length (int)][Name (UTF-8 bytes)][Payload Length (int)][Payload
+                // (bytes)]
                 int nameLen = dis.readInt();
                 byte[] nameBytes = new byte[nameLen];
                 dis.readFully(nameBytes);
@@ -245,7 +272,10 @@ public class KingServer {
             AuditLogger.logError("BinaryStream", e.getMessage());
         } finally {
             dispatchThread.interrupt();
-            try { socket.close(); } catch (IOException ignored) {}
+            try {
+                socket.close();
+            } catch (IOException ignored) {
+            }
         }
     }
 
@@ -265,16 +295,20 @@ public class KingServer {
         volatile long lastHeartbeat = System.currentTimeMillis();
         private volatile boolean registered = false;
 
-        public ClientHandler(Socket socket) { this.socket = socket; }
+        public ClientHandler(Socket socket) {
+            this.socket = socket;
+        }
 
-        boolean isRegistered() { return registered; }
+        boolean isRegistered() {
+            return registered;
+        }
 
         @Override
         public void run() {
             try {
                 socket.setSoTimeout(0); // no read timeout — heartbeat watchdog handles it
                 out = new PrintWriter(socket.getOutputStream(), true);
-                in  = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
                 String inputLine;
                 while ((inputLine = in.readLine()) != null) {
@@ -305,15 +339,16 @@ public class KingServer {
                         com.google.gson.JsonObject info = new Gson().fromJson(
                                 packet.getPayload(), com.google.gson.JsonObject.class);
                         int roll = info.has("roll") ? info.get("roll").getAsInt() : 0;
-                        String cls  = info.has("class") ? info.get("class").getAsString() : "";
-                        String div  = info.has("division") ? info.get("division").getAsString() : "";
+                        String cls = info.has("class") ? info.get("class").getAsString() : "";
+                        String div = info.has("division") ? info.get("division").getAsString() : "";
                         com.king.util.AttendanceTracker.recordConnection(clientName, roll, cls, div);
                         AuditLogger.logConnect(clientName + " (Roll:" + roll + " " + cls + div + ")");
                     } catch (Exception e) {
                         AuditLogger.logConnect(clientName);
                     }
 
-                    if (statusListener != null) statusListener.onClientConnected(clientName);
+                    if (statusListener != null)
+                        statusListener.onClientConnected(clientName);
                     break;
 
                 case HEARTBEAT:
@@ -349,13 +384,20 @@ public class KingServer {
         }
 
         public void send(String msg) {
-            if (out != null) out.println(msg);
+            if (out != null)
+                out.println(msg);
         }
 
-        public String getClientName() { return clientName; }
+        public String getClientName() {
+            return clientName;
+        }
 
         void close() {
-            try { if (socket != null) socket.close(); } catch (IOException ignored) {}
+            try {
+                if (socket != null)
+                    socket.close();
+            } catch (IOException ignored) {
+            }
         }
 
         private void cleanup() {
@@ -365,7 +407,10 @@ public class KingServer {
             if (statusListener != null && registered) {
                 statusListener.onClientDisconnected(clientName);
             }
-            try { socket.close(); } catch (IOException ignored) {}
+            try {
+                socket.close();
+            } catch (IOException ignored) {
+            }
         }
     }
 }
