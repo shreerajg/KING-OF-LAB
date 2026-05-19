@@ -106,7 +106,7 @@ public class AttendanceTracker {
                                 mergedStudents.put(user, oldAtt);
 } catch (Exception e) {
                                 // Ignore parse errors for a single line
-                            }
+
                         }
                     }
                 } catch (IOException e) {
