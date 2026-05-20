@@ -459,8 +459,20 @@ public class AdminDashboard {
         VBox bConn = new VBox(12);
         Label lConn = new Label("CONNECTIVITY"); lConn.setStyle("-fx-text-fill: rgba(223,226,235,0.4); -fx-font-size: 9px; -fx-font-weight: 900; -fx-letter-spacing: 0.25em;");
         HBox hcConn = new HBox(0); hcConn.setStyle(StitchStyles.glassPanel(0.45, 12) + "-fx-padding: 4;");
-        Button blockBtn = ribbonPillBtn("🚫 Block", false); blockBtn.setOnAction(e -> openUrlOnAll());
-        Button allowBtn = ribbonPillBtn("✅ Allow", false); allowBtn.setStyle(allowBtn.getStyle().replace("transparent", "rgba(0,240,255,0.1)").replace(C_TEXT_MUTED, C_PRIMARY));
+        Button blockBtn = ribbonPillBtn("🚫 Block", false); 
+        Button allowBtn = ribbonPillBtn("✅ Allow", true); 
+        allowBtn.setStyle(allowBtn.getStyle().replace("transparent", "rgba(0,240,255,0.1)").replace(C_TEXT_MUTED, C_PRIMARY));
+        
+        blockBtn.setOnAction(e -> {
+            server.broadcast(pkt(CommandPacket.Type.INTERNET, "DISABLE"));
+            blockBtn.setStyle(blockBtn.getStyle().replace("transparent", "rgba(255,180,171,0.1)").replace(C_TEXT_MUTED, C_DANGER));
+            allowBtn.setStyle(allowBtn.getStyle().replace("rgba(0,240,255,0.1)", "transparent").replace(C_PRIMARY, C_TEXT_MUTED));
+        });
+        allowBtn.setOnAction(e -> {
+            server.broadcast(pkt(CommandPacket.Type.INTERNET, "ENABLE"));
+            allowBtn.setStyle(allowBtn.getStyle().replace("transparent", "rgba(0,240,255,0.1)").replace(C_TEXT_MUTED, C_PRIMARY));
+            blockBtn.setStyle(blockBtn.getStyle().replace("rgba(255,180,171,0.1)", "transparent").replace(C_DANGER, C_TEXT_MUTED));
+        });
         hcConn.getChildren().addAll(blockBtn, allowBtn);
         bConn.getChildren().addAll(lConn, hcConn);
 
