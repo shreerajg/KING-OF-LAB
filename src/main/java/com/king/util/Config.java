@@ -9,9 +9,17 @@ public class Config {
     // ===== AI CONFIGURATION =====
     // Admin can toggle this at runtime – volatile for cross-thread visibility
     public static volatile boolean aiEnabled = false;
+
+    // -- Pollinations AI (online / primary) --
+    // Free, no API key. Uses OpenAI-compatible endpoint.
+    // Swap POLLINATIONS_MODEL to "mistral", "claude-hybridspace", etc. if needed.
+    public static final String POLLINATIONS_URL   = "https://text.pollinations.ai/openai";
+    public static final String POLLINATIONS_MODEL = "openai";   // GPT-4o-mini class
+
+    // -- Ollama (offline / fallback) --
     public static final String OLLAMA_URL  = "http://localhost:11434";
-    public static final String AI_MODEL    = "qwen2.5:7b"; // change to any installed Ollama model
-    public static final int    AI_TIMEOUT_MS = 60_000;      // 60-second timeout for AI response
+    public static final String AI_MODEL    = "qwen2.5:7b";  // change to any installed model
+    public static final int    AI_TIMEOUT_MS = 60_000;       // 60-second read timeout
 
     // ===== STREAMING CONFIGURATION =====
     public static final int    FPS_ULTRA   = 60;   // DXGI/GPU ultra mode (60 FPS producer)
