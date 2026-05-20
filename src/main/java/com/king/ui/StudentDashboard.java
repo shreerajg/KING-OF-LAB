@@ -57,6 +57,10 @@ public class StudentDashboard {
     private static Label  statusLabel;
     private static String currentUsername;
 
+    // Manual connect panel reference
+    private static VBox   manualConnectPanel;
+    private static User   currentUser;
+
     private static String downloadFolder = System.getProperty("user.home") + "/Downloads/KingLab";
     private static boolean handRaised = false;
     private static Button  raiseHandBtn;
@@ -68,12 +72,15 @@ public class StudentDashboard {
 
     public static void show(Stage stage, User user) {
         currentUsername = user.getUsername();
+        currentUser = user;
         new File(downloadFolder).mkdirs();
 
-        // Discover admin
+        // Discover admin — auto-connect or update IP when admin is found
         discoveryService = new DiscoveryService();
         discoveryService.setListener((serverIp, port) -> {
-            if (client == null) {
+            if (client == null || !client.isConnected()) {
+                // Either first connection or previous client dropped — (re)create
+                if (client != null) client.disconnect();
                 client = new KingClient(serverIp, user);
                 client.setListener(StudentDashboard::handleCommand);
                 client.connect();
@@ -151,6 +158,15 @@ public class StudentDashboard {
         settingsPanel.setOpacity(0);
         StackPane.setAlignment(settingsPanel, Pos.CENTER);
         root.getChildren().add(settingsPanel);
+
+        // ===== MANUAL CONNECT PANEL (shows after 15s of no connection) =====
+        manualConnectPanel = buildManualConnectPanel();
+        manualConnectPanel.setVisible(false);
+        manualConnectPanel.setOpacity(0);
+        StackPane.setAlignment(manualConnectPanel, Pos.BOTTOM_CENTER);
+        StackPane.setMargin(manualConnectPanel, new Insets(0, 0, 90, 0));
+        root.getChildren().add(manualConnectPanel);
+        startManualConnectTimer();
 
         Scene scene = new Scene(root, 1100, 760);
         stage.setScene(scene);
@@ -297,6 +313,7 @@ public class StudentDashboard {
                 toolBtn("💬 LAN CHAT",     StitchStyles.rgba(StitchStyles.C_PRIMARY, 0.1), StitchStyles.C_PRIMARY, () -> slideToggle(chatPanel, true,  aiPanel, settingsPanel)),
                 toolBtn("🧠 KING AI",      StitchStyles.rgba("#9D5CFF", 0.1), "#9D5CFF", () -> slideToggle(aiPanel, false, chatPanel, settingsPanel)),
                 toolBtn("📂 FILES",        StitchStyles.rgba("#7af19c", 0.1), "#7af19c", () -> openFolder()),
+                toolBtn("🔌 CONNECT",      StitchStyles.rgba("#ffc857", 0.1), "#ffc857", () -> popToggle(manualConnectPanel, chatPanel, aiPanel, settingsPanel)),
                 toolBtn("⚙ SETTINGS",      StitchStyles.rgba(StitchStyles.C_TEXT_MAIN, 0.05), StitchStyles.C_TEXT_MAIN, () -> popToggle(settingsPanel, chatPanel, aiPanel))
         );
         return toolbar;
@@ -679,11 +696,13 @@ public class StudentDashboard {
                     String np = packet.getPayload();
                     if ("CONNECTED".equals(np)) {
                         if (statusDot   != null) statusDot.setFill(Color.web("#2ecc71"));
-                        if (statusLabel != null) statusLabel.setText("Connected");
+                        if (statusLabel != null) statusLabel.setText("CONNECTED");
                         showNotification("✅ Connected to Admin!");
+                        // Hide manual connect panel on successful connection
+                        hideManualConnectPanel();
                     } else if (np != null && (np.contains("disconnected") || np.contains("lost"))) {
                         if (statusDot   != null) statusDot.setFill(Color.web("#e74c3c"));
-                        if (statusLabel != null) statusLabel.setText("Disconnected");
+                        if (statusLabel != null) statusLabel.setText("DISCONNECTED");
                         if (streamView  != null) streamView.setImage(null);
                         showNotification(np);
                     } else {
@@ -835,6 +854,151 @@ public class StudentDashboard {
     }
 
     // -----------------------------------------------------------------------
+    // MANUAL CONNECT PANEL
+    // -----------------------------------------------------------------------
+
+    /**
+     * Builds a floating panel where the student can type the admin IP manually.
+     * Visible when: auto-discovery has not connected after ~15 seconds,
+     * or the student clicks "🔌 CONNECT" in the toolbar.
+     */
+    private static VBox buildManualConnectPanel() {
+        VBox p = new VBox(14);
+        p.setMaxWidth(420);
+        p.setPadding(new Insets(24, 30, 24, 30));
+        p.setStyle(
+                "-fx-background-color: rgba(8,10,20,0.95);" +
+                "-fx-background-radius: 20;" +
+                "-fx-border-color: rgba(255,200,87,0.35);" +
+                "-fx-border-radius: 20;" +
+                "-fx-border-width: 1.5;");
+        p.setEffect(new DropShadow(28, Color.web("#ffc857", 0.28)));
+        p.setAlignment(Pos.CENTER);
+
+        Label title = new Label("⚠️  CANNOT FIND ADMIN");
+        title.setStyle("-fx-text-fill: #ffc857; -fx-font-size: 13px; -fx-font-weight: 900; -fx-letter-spacing: 0.15em;");
+        title.setEffect(new Glow(0.4));
+
+        Label sub = new Label("Auto-discovery timed out. Enter the admin IP address manually:");
+        sub.setStyle("-fx-text-fill: rgba(255,255,255,0.55); -fx-font-size: 11px; -fx-wrap-text: true; -fx-text-alignment: center;");
+        sub.setWrapText(true);
+        sub.setMaxWidth(360);
+
+        TextField ipField = new TextField();
+        ipField.setPromptText("e.g.  192.168.1.10");
+        ipField.setStyle(
+                "-fx-background-color: rgba(255,200,87,0.08);" +
+                "-fx-text-fill: #ffc857;" +
+                "-fx-prompt-text-fill: rgba(255,200,87,0.35);" +
+                "-fx-background-radius: 10;" +
+                "-fx-border-color: rgba(255,200,87,0.3);" +
+                "-fx-border-radius: 10;" +
+                "-fx-padding: 10 14;" +
+                "-fx-font-size: 14px; -fx-font-weight: bold;");
+        ipField.setMaxWidth(300);
+
+        Label statusMsg = new Label("");
+        statusMsg.setStyle("-fx-text-fill: #2ecc71; -fx-font-size: 11px;");
+
+        Button connectBtn = new Button("🔌  CONNECT");
+        connectBtn.setStyle(
+                "-fx-background-color: #ffc857;" +
+                "-fx-text-fill: #080a14;" +
+                "-fx-font-weight: 900;" +
+                "-fx-font-size: 12px;" +
+                "-fx-letter-spacing: 0.1em;" +
+                "-fx-background-radius: 12;" +
+                "-fx-padding: 10 28;" +
+                "-fx-cursor: hand;");
+
+        Button dismissBtn = new Button("Keep Searching");
+        dismissBtn.setStyle(
+                "-fx-background-color: transparent;" +
+                "-fx-text-fill: rgba(255,255,255,0.35);" +
+                "-fx-font-size: 10px;" +
+                "-fx-cursor: hand;" +
+                "-fx-underline: true;");
+        dismissBtn.setOnAction(e -> hideManualConnectPanel());
+
+        Runnable doConnect = () -> {
+            String ip = ipField.getText().trim();
+            if (ip.isEmpty()) {
+                statusMsg.setText("⚠ Please enter an IP address");
+                statusMsg.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 11px;");
+                return;
+            }
+            statusMsg.setText("🔄 Connecting to " + ip + "...");
+            statusMsg.setStyle("-fx-text-fill: #ffc857; -fx-font-size: 11px;");
+            connectBtn.setDisable(true);
+            if (client != null) {
+                client.updateAdminIp(ip);
+                // Force reconnect if not connected
+                if (!client.isConnected()) {
+                    client.disconnect();
+                    client = new KingClient(ip, currentUser);
+                    client.setListener(StudentDashboard::handleCommand);
+                    client.connect();
+                }
+            } else {
+                client = new KingClient(ip, currentUser);
+                client.setListener(StudentDashboard::handleCommand);
+                client.connect();
+            }
+            AuditLogger.logSystem("Manual connect attempt to " + ip);
+            // Re-enable after a short delay so rapid-clicks are debounced
+            Timeline reenable = new Timeline(new KeyFrame(Duration.seconds(3), ev -> connectBtn.setDisable(false)));
+            reenable.play();
+        };
+
+        connectBtn.setOnAction(e -> doConnect.run());
+        ipField.setOnAction(e -> doConnect.run());
+
+        HBox btnRow = new HBox(14, connectBtn, dismissBtn);
+        btnRow.setAlignment(Pos.CENTER);
+
+        p.getChildren().addAll(title, sub, ipField, btnRow, statusMsg);
+        return p;
+    }
+
+    /** Fade-in the manual connect panel (safe to call from any thread). */
+    private static void showManualConnectPanel() {
+        if (manualConnectPanel == null) return;
+        Platform.runLater(() -> {
+            if (manualConnectPanel.isVisible()) return; // already shown
+            manualConnectPanel.setVisible(true);
+            FadeTransition ft = new FadeTransition(Duration.millis(350), manualConnectPanel);
+            ft.setFromValue(0); ft.setToValue(1); ft.play();
+        });
+    }
+
+    /** Fade-out the manual connect panel. */
+    private static void hideManualConnectPanel() {
+        if (manualConnectPanel == null || !manualConnectPanel.isVisible()) return;
+        FadeTransition ft = new FadeTransition(Duration.millis(250), manualConnectPanel);
+        ft.setFromValue(1); ft.setToValue(0);
+        ft.setOnFinished(e -> manualConnectPanel.setVisible(false));
+        ft.play();
+    }
+
+    /**
+     * Starts a 15-second one-shot timer.
+     * If the student is still not connected after 15 s, the manual-IP panel
+     * is shown.  Once connected it is hidden automatically.
+     */
+    private static void startManualConnectTimer() {
+        Timeline timer = new Timeline(new KeyFrame(Duration.seconds(15), e -> {
+            boolean isConn = (client != null && client.isConnected());
+            if (!isConn) {
+                showManualConnectPanel();
+                // Update status dot to "warn" colour
+                if (statusDot   != null) statusDot.setFill(Color.web("#e74c3c"));
+                if (statusLabel != null) statusLabel.setText("NOT FOUND");
+            }
+        }));
+        timer.play();
+    }
+
+    // -----------------------------------------------------------------------
     // THEME APPLICATION - Deprecated with Stitch Hologram Redesign
     // -----------------------------------------------------------------------
 
@@ -868,7 +1032,11 @@ public class StudentDashboard {
     }
 
     private static void popToggle(VBox panel, VBox... others) {
-        for (VBox o : others) { if (o.isVisible()) slideOut(o, o == chatPanel); }
+        for (VBox o : others) { if (o.isVisible()) {
+            if (o == chatPanel)   slideOut(o, true);
+            else if (o == aiPanel) slideOut(o, false);
+            else                  popClose(o);
+        }}
         if (!panel.isVisible()) popOpen(panel);
         else popClose(panel);
     }
