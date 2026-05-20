@@ -27,11 +27,11 @@ import javax.imageio.*;
  * ─────────────────────────────────────────────────────────────────
  *
  * STUDENT PIPELINE  (no cursor, flicker-free):
- *   ddagrab  → scale → mjpeg   (GPU path, 30 FPS)
+ *   ddagrab  → scale → mjpeg   (GPU path, 20 FPS)
  *   fallback: gdigrab → mjpeg  (CPU path, draw_mouse=0)
  *
- * ADMIN PIPELINE  (admin screen-share only, cursor included):
- *   ddagrab  → scale → mjpeg   (GPU path, 30 FPS, draw_mouse=1 overlay)
+ * ADMIN PIPELINE  (admin screen-share, cursor-free):
+ *   ddagrab  → scale → mjpeg   (GPU path, 30 FPS, draw_mouse=0)
  *   note: admin pipe started ONLY when screen-share is active.
  *
  * Static init: student pipe starts immediately for best first-frame latency.
@@ -182,11 +182,10 @@ public class ScreenCapture {
     }
 
     // -----------------------------------------------------------------------
-    // Admin pipe management  (cursor visible, 30 FPS — admin screen-share only)
+    // Admin pipe management  (cursor-FREE, 30 FPS — admin screen-share only)
     //
-    // For admin we still use ddagrab (or gdigrab as fallback), but with
-    // draw_mouse=1 so the admin's cursor is visible to students.
-    // Admin pipe is only started when screen-share is explicitly enabled.
+    // Both ddagrab and gdigrab paths use draw_mouse=0 so the admin's cursor
+    // is never composited onto frames.  Students see a clean desktop only.
     // -----------------------------------------------------------------------
     private static synchronized void startAdminPipe() {
         if (adminPipeUp.get()) return;
@@ -201,8 +200,8 @@ public class ScreenCapture {
                 FfmpegResolver.get(),
                 "-loglevel", "quiet",
                 "-f",        "lavfi",
-                "-i",        "ddagrab=output_idx=0:framerate=30:draw_mouse=1",
-                "-vf",       "hwdownload,format=bgra,scale=iw:ih,format=yuv420p",
+                "-i",        "ddagrab=output_idx=0:framerate=30:draw_mouse=0",  // cursor-free
+                "-vf",       "hwdownload,format=bgra,scale=1280:-2,format=yuv420p",
                 "-f",        "mjpeg",
                 "-q:v",      "3",
                 "pipe:1"
@@ -224,7 +223,7 @@ public class ScreenCapture {
             adminReader.setPriority(Thread.NORM_PRIORITY - 1);
             adminReader.start();
 
-            System.out.println("[ScreenCapture] Admin pipe started via ddagrab");
+            System.out.println("[ScreenCapture] Admin pipe started via ddagrab (cursor-free)");
             return true;
 
         } catch (Exception e) {
