@@ -56,7 +56,8 @@ public class KingClient {
     private VideoEncoder ultraEncoder;
 
     // Reconnect back-off state
-    private int reconnectDelay = 3; // seconds, doubles each failure up to 30
+    private int     reconnectDelay = 3; // seconds, doubles each failure up to 30
+    private boolean connected      = false;
 
     public interface CommandListener {
         void onCommand(CommandPacket packet);
@@ -77,6 +78,8 @@ public class KingClient {
 
     public void setListener(CommandListener listener) { this.listener = listener; }
     public void setScreenSending(boolean enabled)     { this.sendingScreens = enabled; }
+    public boolean isConnected()    { return connected; }
+    public int     getReconnectDelay() { return reconnectDelay; }
 
     // -----------------------------------------------------------------------
     // Connect loop
@@ -95,6 +98,7 @@ public class KingClient {
 
                     // Reset back-off on successful connect
                     reconnectDelay = 3;
+                    connected      = true;
                     AuditLogger.logSystem("Connected to admin at " + adminIp);
 
                     if (listener != null)
@@ -123,6 +127,7 @@ public class KingClient {
                             + " — retry in " + reconnectDelay + "s");
                 }
 
+                connected = false;
                 stopScreenCapture();
                 stopHeartbeat();
                 closeSocket();
