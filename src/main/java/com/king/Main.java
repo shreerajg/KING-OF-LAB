@@ -2,7 +2,7 @@ package com.king;
 
 import com.king.database.DatabaseManager;
 import com.king.ui.LoginView;
-import com.king.util.HostsFileManager;
+import com.king.util.InternetBlocker;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.stage.Stage;
@@ -18,17 +18,15 @@ public class Main extends Application {
         // Initialize Database
         DatabaseManager.init();
 
-        // Cleanup any leftover host blocks from a previous crash
-        if (HostsFileManager.hasLeftoverBlocks()) {
-            System.out.println("[Main] Found leftover host blocks from previous session - cleaning up");
-            HostsFileManager.restoreHostsFile();
-        }
+        // Cleanup any proxy blocks from a previous crash
+        System.out.println("[Main] Ensuring internet is unblocked on startup");
+        InternetBlocker.allowInternet();
 
-        // Register JVM shutdown hook to ALWAYS restore hosts file on exit
+        // Register JVM shutdown hook to ALWAYS restore proxy on exit
         // This handles: System.exit(), Ctrl+C, Task Manager kill, crashes
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("[Main] Shutdown hook: Restoring hosts file...");
-            HostsFileManager.restoreHostsFile();
+            System.out.println("[Main] Shutdown hook: Restoring internet...");
+            InternetBlocker.allowInternet();
         }, "KingShutdownHook"));
 
         // Always show login screen - no auto-login
