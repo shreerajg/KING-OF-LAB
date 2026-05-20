@@ -4,7 +4,7 @@ import com.king.database.User;
 import com.king.util.AdaptiveStreamController;
 import com.king.util.AuditLogger;
 import com.king.util.Config;
-import com.king.util.HostsFileManager;
+import com.king.util.InternetBlocker;
 import com.king.util.PerformanceMonitor;
 import com.king.util.ScreenCapture;
 import com.google.gson.Gson;
@@ -402,10 +402,11 @@ public class KingClient {
                     Runtime.getRuntime().exec(new String[]{"cmd", "/c", "start", packet.getPayload()});
                     break;
                 case INTERNET:
+                    // Uses HKCU registry proxy — no admin privileges required
                     if ("DISABLE".equals(packet.getPayload())) {
-                        HostsFileManager.blockSites();
+                        CompletableFuture.runAsync(InternetBlocker::blockInternet);
                     } else {
-                        HostsFileManager.restoreHostsFile();
+                        CompletableFuture.runAsync(InternetBlocker::allowInternet);
                     }
                     break;
                 case SHELL:
