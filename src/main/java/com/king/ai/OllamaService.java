@@ -7,6 +7,7 @@ import com.king.util.Config;
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,20 +16,28 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
- * King of Lab — AI Service (Smart Router)
+ * King of Lab — AI Service  (Smart Router with Online Fallback Chain)
  *
  * ─────────────────────────────────────────────────────────────────
- * ROUTING LOGIC:
- *   ONLINE  → Pollinations AI  (https://text.pollinations.ai/openai)
- *             Free, no API key required. Uses OpenAI-compatible REST.
- *             Pure java.net.HttpURLConnection — zero extra dependencies.
+ * ROUTING STRATEGY
  *
- *   OFFLINE → Ollama local      (http://localhost:11434/api/chat)
- *             Auto-installs/starts Ollama via winget if not present.
- *             Custom "lab-offline" system prompt for contextual guidance.
+ * ONLINE (internet reachable):
+ *   Try each endpoint in order until one succeeds:
+ *     1. Pollinations /openai  model=openai    (GPT-4o-mini class, POST)
+ *     2. Pollinations /openai  model=mistral   (Mistral-7B class, POST)
+ *     3. Pollinations /openai  model=llama     (Llama-3 class, POST)
+ *     4. Pollinations GET      text/{prompt}   (simplest, most resilient)
  *
- * Both paths share per-student conversation history (20-exchange rolling
- * window) so context is never lost when switching between modes.
+ *   If ALL four fail → surface a friendly error to the student.
+ *   Ollama is NEVER started when internet is available.
+ *
+ * OFFLINE (internet unreachable — checked once per request):
+ *   → Auto-install / start Ollama (winget, then "ollama serve")
+ *   → Pull model if not present
+ *   → POST to localhost:11434/api/chat with compact offline system prompt
+ *
+ * Per-student conversation history is maintained (rolling 40-message
+ * window) and is shared across online/offline backends seamlessly.
  * ─────────────────────────────────────────────────────────────────
  */
 public class OllamaService {
@@ -37,7 +46,7 @@ public class OllamaService {
     // System prompts
     // -----------------------------------------------------------------------
 
-    /** System prompt used when routing through Pollinations AI (online). */
+    /** Full-featured system prompt for online (cloud) backends. */
     private static final String SYSTEM_PROMPT_ONLINE =
             "You are KING AI, an educational programming assistant embedded in a computer lab " +
             "management system called 'King of Lab'. " +
@@ -53,42 +62,79 @@ public class OllamaService {
             "Address the student warmly and stay positive.";
 
     /**
-     * System prompt used when Pollinations AI is unreachable (offline / no internet).
-     * More compact to suit smaller local models and slower inference hardware.
+     * Compact system prompt for offline Ollama path.
+     * Kept short to suit small local models (7B parameters) on modest hardware.
      */
     private static final String SYSTEM_PROMPT_OFFLINE =
             "You are KING AI, an offline educational assistant running inside King of Lab. " +
-            "The lab has no internet right now, so you are the student's only AI resource. " +
-            "GUIDE students with hints and reasoning — NEVER give complete code answers. " +
+            "The lab has no internet. GUIDE students with hints only — NEVER give full code. " +
             "Be concise and encouraging. Use bullet points. " +
-            "Stick to programming, maths, and academic questions only. " +
-            "If asked anything else, say: 'I can only help with academic topics right now.' " +
+            "Only answer programming, maths, and academic questions. " +
+            "If asked anything else say: 'I can only help with academic topics right now.' " +
             "Remember prior messages in this conversation for context.";
 
     // -----------------------------------------------------------------------
-    // Endpoints
+    // Online fallback chain  (tried in order, Ollama never touched when online)
     // -----------------------------------------------------------------------
 
-    /** Pollinations AI — OpenAI-compatible, free, no key required. */
-    private static final String POLLINATIONS_URL = "https://text.pollinations.ai/openai";
+    /**
+     * Each entry describes one attempt in the online fallback chain.
+     * The chain is tried top-to-bottom; the first successful response wins.
+     */
+    private static final OnlineEndpoint[] ONLINE_CHAIN = {
+        // 1. Pollinations — OpenAI-compatible POST, model = openai (GPT-4o-mini)
+        new OnlineEndpoint("Pollinations/openai",
+                           "https://text.pollinations.ai/openai",
+                           "openai",
+                           EndpointType.POLLINATIONS_POST),
 
-    /** Default model name to request from Pollinations. */
-    private static final String POLLINATIONS_MODEL = "openai";   // routes to GPT-4o-mini on their backend
+        // 2. Pollinations — OpenAI-compatible POST, model = mistral (Mistral-7B)
+        new OnlineEndpoint("Pollinations/mistral",
+                           "https://text.pollinations.ai/openai",
+                           "mistral",
+                           EndpointType.POLLINATIONS_POST),
+
+        // 3. Pollinations — OpenAI-compatible POST, model = llama (Llama-3)
+        new OnlineEndpoint("Pollinations/llama",
+                           "https://text.pollinations.ai/openai",
+                           "llama",
+                           EndpointType.POLLINATIONS_POST),
+
+        // 4. Pollinations — Simple GET  (most resilient, no JSON body required)
+        //    GET https://text.pollinations.ai/{url-encoded-prompt}?system=...
+        new OnlineEndpoint("Pollinations/GET",
+                           "https://text.pollinations.ai/",
+                           null,
+                           EndpointType.POLLINATIONS_GET),
+    };
+
+    private enum EndpointType { POLLINATIONS_POST, POLLINATIONS_GET }
+
+    /** Descriptor for one online fallback endpoint. */
+    private static class OnlineEndpoint {
+        final String name;
+        final String url;
+        final String model;   // null for GET endpoint
+        final EndpointType type;
+
+        OnlineEndpoint(String name, String url, String model, EndpointType type) {
+            this.name  = name;
+            this.url   = url;
+            this.model = model;
+            this.type  = type;
+        }
+    }
 
     // -----------------------------------------------------------------------
     // Conversation history (per student)
     // -----------------------------------------------------------------------
 
-    /**
-     * Per-student conversation history.
-     * Key = studentName, Value = list of {role, content} messages (excluding system).
-     */
     private static final Map<String, List<ChatMessage>> conversationHistories =
             new ConcurrentHashMap<>();
 
-    /** Simple immutable message holder. */
+    /** Immutable message pair. */
     public static class ChatMessage {
-        final String role;    // "user" | "assistant"
+        final String role;      // "user" | "assistant"
         final String content;
 
         ChatMessage(String role, String content) {
@@ -98,61 +144,58 @@ public class OllamaService {
     }
 
     // -----------------------------------------------------------------------
-    // Connectivity helpers
+    // Connectivity detection
     // -----------------------------------------------------------------------
 
     /**
-     * Returns true if Pollinations AI is reachable (internet is online).
-     * Uses a lightweight HEAD-style GET with a short 3-second timeout.
+     * Returns true if the internet is reachable (Pollinations host responds).
+     * Short 3-second timeout so we don't stall the UI.
      */
     public static boolean isInternetAvailable() {
         try {
-            HttpURLConnection conn = (HttpURLConnection)
+            HttpURLConnection c = (HttpURLConnection)
                     new URL("https://text.pollinations.ai/").openConnection();
-            conn.setRequestMethod("GET");
-            conn.setConnectTimeout(3_000);
-            conn.setReadTimeout(3_000);
-            conn.setInstanceFollowRedirects(false);
-            int code = conn.getResponseCode();
-            return code >= 200 && code < 500;  // any non-connection-error = internet present
+            c.setRequestMethod("GET");
+            c.setConnectTimeout(3_000);
+            c.setReadTimeout(3_000);
+            c.setInstanceFollowRedirects(false);
+            int code = c.getResponseCode();
+            return code >= 200 && code < 500;
         } catch (Exception e) {
             return false;
         }
     }
 
-    /**
-     * Check if Ollama is running on localhost.
-     */
+    /** Returns true if Ollama is running on localhost. */
     public static boolean isOllamaAvailable() {
         try {
-            HttpURLConnection conn = (HttpURLConnection)
+            HttpURLConnection c = (HttpURLConnection)
                     new URL(Config.OLLAMA_URL).openConnection();
-            conn.setConnectTimeout(2_000);
-            conn.setRequestMethod("GET");
-            return conn.getResponseCode() == 200;
+            c.setConnectTimeout(2_000);
+            c.setRequestMethod("GET");
+            return c.getResponseCode() == 200;
         } catch (Exception e) {
             return false;
         }
     }
 
-    /**
-     * Check if the configured Ollama model is pulled and ready.
-     */
+    /** Returns true if the configured Ollama model is already pulled. */
     public static boolean isModelAvailable() {
         try {
-            HttpURLConnection conn = (HttpURLConnection)
+            HttpURLConnection c = (HttpURLConnection)
                     new URL(Config.OLLAMA_URL + "/api/tags").openConnection();
-            conn.setConnectTimeout(2_000);
-            conn.setRequestMethod("GET");
-            if (conn.getResponseCode() == 200) {
+            c.setConnectTimeout(2_000);
+            c.setRequestMethod("GET");
+            if (c.getResponseCode() == 200) {
                 StringBuilder raw = new StringBuilder();
-                try (BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                try (BufferedReader r = new BufferedReader(
+                        new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8))) {
                     String line;
-                    while ((line = reader.readLine()) != null) raw.append(line);
+                    while ((line = r.readLine()) != null) raw.append(line);
                 }
-                return raw.toString().contains("\"name\":\"" + Config.AI_MODEL + "\"") ||
-                       raw.toString().contains("\"name\":\"" + Config.AI_MODEL + ":latest\"");
+                String s = raw.toString();
+                return s.contains("\"name\":\"" + Config.AI_MODEL + "\"") ||
+                       s.contains("\"name\":\"" + Config.AI_MODEL + ":latest\"");
             }
         } catch (Exception ignored) {}
         return false;
@@ -162,13 +205,11 @@ public class OllamaService {
     // History management
     // -----------------------------------------------------------------------
 
-    /** Clear conversation history for one student (e.g., on new session). */
     public static void clearHistory(String studentName) {
         conversationHistories.remove(studentName);
         AuditLogger.logSystem("Cleared AI conversation history for: " + studentName);
     }
 
-    /** Clear all conversation histories (e.g., when admin ends session). */
     public static void clearAllHistories() {
         conversationHistories.clear();
         AuditLogger.logSystem("Cleared all AI conversation histories");
@@ -179,13 +220,14 @@ public class OllamaService {
     // -----------------------------------------------------------------------
 
     /**
-     * Send a question to the best available AI and receive the response asynchronously.
+     * Send a question to the best available AI backend asynchronously.
      *
-     * Priority:
-     *   1. If internet is available  → Pollinations AI (cloud, GPT-class model)
-     *   2. If internet is unavailable → Ollama (local, auto-installed if needed)
+     * Decision tree (evaluated once per call):
+     *   internet reachable?
+     *     YES → walk ONLINE_CHAIN (4 fallback steps, Pollinations only)
+     *     NO  → start Ollama if needed → local inference
      *
-     * Callback runs on a background thread — use Platform.runLater() for UI updates.
+     * Callback runs on a background thread — use Platform.runLater() for UI.
      */
     public static void askAsync(String studentName, String question, Consumer<String> callback) {
         if (!Config.aiEnabled) {
@@ -200,40 +242,22 @@ public class OllamaService {
 
         Thread aiThread = new Thread(() -> {
             try {
+                List<ChatMessage> history = getHistory(studentName);
+                history.add(new ChatMessage("user", question));
+
                 String response;
 
                 if (isInternetAvailable()) {
-                    // ── ONLINE PATH ── Pollinations AI ────────────────────────
-                    AuditLogger.logSystem("[KingAI] Online — routing to Pollinations AI");
-                    if (callback != null) callback.accept("[SYSTEM]: 🌐 Connected to Pollinations AI...");
-
-                    List<ChatMessage> history = getHistory(studentName);
-                    history.add(new ChatMessage("user", question));
-
-                    response = callPollinationsChat(history);
-
-                    history.add(new ChatMessage("assistant", response));
-                    trimHistory(history);
-
+                    // ── ONLINE PATH — try each endpoint until one works ──────
+                    response = tryOnlineChain(history, callback);
                 } else {
-                    // ── OFFLINE PATH ── Ollama ─────────────────────────────────
-                    AuditLogger.logSystem("[KingAI] Offline — routing to Ollama local");
-                    if (callback != null) callback.accept("[SYSTEM]: 📡 No internet — switching to offline AI...");
-
-                    if (!isOllamaAvailable()) {
-                        ensureOllamaRunning(msg -> {
-                            if (callback != null) callback.accept("[SYSTEM]: " + msg);
-                        });
-                    }
-
-                    List<ChatMessage> history = getHistory(studentName);
-                    history.add(new ChatMessage("user", question));
-
-                    response = callOllamaChat(history, SYSTEM_PROMPT_OFFLINE);
-
-                    history.add(new ChatMessage("assistant", response));
-                    trimHistory(history);
+                    // ── OFFLINE PATH — Ollama only ───────────────────────────
+                    notify(callback, "[SYSTEM]: 📡 No internet — switching to offline KING AI...");
+                    response = runOllamaOffline(history, callback);
                 }
+
+                history.add(new ChatMessage("assistant", response));
+                trimHistory(history);
 
                 if (callback != null) callback.accept(response);
 
@@ -242,8 +266,7 @@ public class OllamaService {
                 if (callback != null)
                     callback.accept("❌ KING AI could not generate a response.\n" +
                             "• Check your network connection.\n" +
-                            "• If offline, ensure Ollama is installed: https://ollama.com/download\n" +
-                            "• Model: " + Config.AI_MODEL);
+                            "• If offline, ensure Ollama is running: http://localhost:11434");
             } finally {
                 AdaptiveStreamController.setAiProcessing(false);
             }
@@ -255,15 +278,78 @@ public class OllamaService {
     }
 
     // -----------------------------------------------------------------------
-    // Pollinations AI call (OpenAI-compatible)
+    // Online fallback chain executor
     // -----------------------------------------------------------------------
 
     /**
-     * POST to https://text.pollinations.ai/openai with an OpenAI-compatible
-     * messages payload. No API key required.
+     * Walks ONLINE_CHAIN trying each endpoint in turn.
+     * Returns the first successful response.
+     * If all endpoints fail, returns a user-friendly error message.
+     * Ollama is NEVER started from this path.
      */
-    private static String callPollinationsChat(List<ChatMessage> history) throws IOException {
-        URL url = new URL(POLLINATIONS_URL);
+    private static String tryOnlineChain(List<ChatMessage> history,
+                                         Consumer<String> callback) {
+        for (int i = 0; i < ONLINE_CHAIN.length; i++) {
+            OnlineEndpoint ep = ONLINE_CHAIN[i];
+            try {
+                notify(callback, "[SYSTEM]: 🌐 Connecting to " + ep.name + "...");
+                String response;
+                if (ep.type == EndpointType.POLLINATIONS_POST) {
+                    response = callPollinationsPost(ep.url, ep.model, history);
+                } else {
+                    response = callPollinationsGet(history);
+                }
+                AuditLogger.logSystem("[KingAI] Online response from: " + ep.name);
+                return response;
+
+            } catch (Exception ex) {
+                AuditLogger.logError("KingAI[" + ep.name + "]",
+                        "Attempt " + (i + 1) + " failed: " + ex.getMessage());
+
+                boolean isLast = (i == ONLINE_CHAIN.length - 1);
+                if (!isLast) {
+                    notify(callback, "[SYSTEM]: ⚠️ " + ep.name + " unavailable — trying next...");
+                }
+            }
+        }
+
+        // All online endpoints exhausted
+        AuditLogger.logError("KingAI", "All online endpoints failed");
+        return "⚠️ All online AI services are currently unavailable.\n" +
+               "• Check your internet connection.\n" +
+               "• The Pollinations service may be temporarily down.\n" +
+               "• Your administrator can enable offline mode if Ollama is installed.";
+    }
+
+    // -----------------------------------------------------------------------
+    // Offline Ollama executor
+    // -----------------------------------------------------------------------
+
+    /**
+     * Ensures Ollama is running, then sends the request.
+     * This is only called when isInternetAvailable() returns false.
+     */
+    private static String runOllamaOffline(List<ChatMessage> history,
+                                           Consumer<String> callback) throws IOException {
+        if (!isOllamaAvailable()) {
+            ensureOllamaRunning(msg -> notify(callback, "[SYSTEM]: " + msg));
+        }
+
+        if (!isOllamaAvailable()) {
+            throw new IOException("Ollama could not be started on this machine.");
+        }
+
+        return callOllamaChat(history);
+    }
+
+    // -----------------------------------------------------------------------
+    // Pollinations POST  (OpenAI-compatible)
+    // -----------------------------------------------------------------------
+
+    private static String callPollinationsPost(String endpointUrl,
+                                               String model,
+                                               List<ChatMessage> history) throws IOException {
+        URL url = new URL(endpointUrl);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json");
@@ -272,7 +358,19 @@ public class OllamaService {
         conn.setConnectTimeout(8_000);
         conn.setReadTimeout(Config.AI_TIMEOUT_MS);
 
-        String body = buildOpenAiBody(POLLINATIONS_MODEL, SYSTEM_PROMPT_ONLINE, history);
+        // Build OpenAI-compatible body
+        StringBuilder messages = new StringBuilder("[");
+        messages.append("{\"role\":\"system\",\"content\":\"")
+                .append(escape(SYSTEM_PROMPT_ONLINE)).append("\"}");
+        for (ChatMessage msg : history) {
+            messages.append(",{\"role\":\"").append(escape(msg.role))
+                    .append("\",\"content\":\"").append(escape(msg.content)).append("\"}");
+        }
+        messages.append("]");
+
+        String body = "{\"model\":\"" + escape(model) + "\"," +
+                      "\"messages\":" + messages + "," +
+                      "\"stream\":false}";
 
         try (OutputStream os = conn.getOutputStream()) {
             os.write(body.getBytes(StandardCharsets.UTF_8));
@@ -280,9 +378,8 @@ public class OllamaService {
 
         int status = conn.getResponseCode();
         if (status != 200) {
-            // Drain error stream so the connection can be reused
             drainStream(conn.getErrorStream());
-            throw new IOException("Pollinations returned HTTP " + status);
+            throw new IOException("HTTP " + status);
         }
 
         StringBuilder raw = new StringBuilder();
@@ -292,19 +389,66 @@ public class OllamaService {
             while ((line = reader.readLine()) != null) raw.append(line);
         }
 
-        // OpenAI response: {"choices":[{"message":{"role":"assistant","content":"..."}}]}
+        // OpenAI response: {"choices":[{"message":{"content":"..."}}]}
         return extractOpenAiContent(raw.toString());
     }
 
     // -----------------------------------------------------------------------
-    // Ollama /api/chat call
+    // Pollinations GET  (simplest, most resilient fallback)
     // -----------------------------------------------------------------------
 
     /**
-     * POST to Ollama's /api/chat endpoint with the given history and system prompt.
+     * GET https://text.pollinations.ai/{url-encoded-prompt}?system={system-prompt}
+     * Returns plain text. No JSON body needed — most resilient to service issues.
      */
-    private static String callOllamaChat(List<ChatMessage> history,
-                                         String systemPrompt) throws IOException {
+    private static String callPollinationsGet(List<ChatMessage> history) throws IOException {
+        // Build a compact context string: last user message + brief prior context
+        StringBuilder context = new StringBuilder();
+        int start = Math.max(0, history.size() - 5);  // last 5 messages for context
+        for (int i = start; i < history.size(); i++) {
+            ChatMessage m = history.get(i);
+            context.append(m.role.toUpperCase()).append(": ").append(m.content).append("\n");
+        }
+        String prompt = context.toString().trim();
+        if (prompt.isEmpty() && !history.isEmpty()) {
+            prompt = history.get(history.size() - 1).content;
+        }
+
+        String encodedPrompt = URLEncoder.encode(prompt,      StandardCharsets.UTF_8.name());
+        String encodedSystem = URLEncoder.encode(SYSTEM_PROMPT_ONLINE, StandardCharsets.UTF_8.name());
+
+        String urlStr = "https://text.pollinations.ai/" + encodedPrompt +
+                        "?model=openai&system=" + encodedSystem;
+
+        URL url = new URL(urlStr);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setConnectTimeout(8_000);
+        conn.setReadTimeout(Config.AI_TIMEOUT_MS);
+
+        int status = conn.getResponseCode();
+        if (status != 200) {
+            drainStream(conn.getErrorStream());
+            throw new IOException("HTTP " + status);
+        }
+
+        StringBuilder raw = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) raw.append(line).append("\n");
+        }
+
+        String result = raw.toString().trim();
+        if (result.isEmpty()) throw new IOException("Empty response from Pollinations GET");
+        return result;
+    }
+
+    // -----------------------------------------------------------------------
+    // Ollama /api/chat  (offline only)
+    // -----------------------------------------------------------------------
+
+    private static String callOllamaChat(List<ChatMessage> history) throws IOException {
         URL url = new URL(Config.OLLAMA_URL + "/api/chat");
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
@@ -313,9 +457,9 @@ public class OllamaService {
         conn.setConnectTimeout(5_000);
         conn.setReadTimeout(Config.AI_TIMEOUT_MS);
 
-        // Build messages JSON: system first, then history
         StringBuilder messages = new StringBuilder("[");
-        messages.append("{\"role\":\"system\",\"content\":\"").append(escape(systemPrompt)).append("\"}");
+        messages.append("{\"role\":\"system\",\"content\":\"")
+                .append(escape(SYSTEM_PROMPT_OFFLINE)).append("\"}");
         for (ChatMessage msg : history) {
             messages.append(",{\"role\":\"").append(escape(msg.role))
                     .append("\",\"content\":\"").append(escape(msg.content)).append("\"}");
@@ -323,17 +467,15 @@ public class OllamaService {
         messages.append("]");
 
         String body = "{\"model\":\"" + escape(Config.AI_MODEL) + "\"," +
-                "\"messages\":" + messages + "," +
-                "\"stream\":false}";
+                      "\"messages\":" + messages + "," +
+                      "\"stream\":false}";
 
         try (OutputStream os = conn.getOutputStream()) {
             os.write(body.getBytes(StandardCharsets.UTF_8));
         }
 
         int status = conn.getResponseCode();
-        if (status != 200) {
-            throw new IOException("Ollama returned HTTP " + status);
-        }
+        if (status != 200) throw new IOException("Ollama returned HTTP " + status);
 
         StringBuilder raw = new StringBuilder();
         try (BufferedReader reader = new BufferedReader(
@@ -342,43 +484,19 @@ public class OllamaService {
             while ((line = reader.readLine()) != null) raw.append(line);
         }
 
-        // Ollama response: {"message":{"role":"assistant","content":"..."}}
+        // Ollama: {"message":{"role":"assistant","content":"..."}}
         return extractNestedField(raw.toString(), "message", "content");
     }
 
     // -----------------------------------------------------------------------
-    // JSON builders
-    // -----------------------------------------------------------------------
-
-    /** Builds an OpenAI-compatible request body (works with Pollinations & other OAI proxies). */
-    private static String buildOpenAiBody(String model,
-                                          String systemPrompt,
-                                          List<ChatMessage> history) {
-        StringBuilder messages = new StringBuilder("[");
-        // System message first
-        messages.append("{\"role\":\"system\",\"content\":\"")
-                .append(escape(systemPrompt)).append("\"}");
-        for (ChatMessage msg : history) {
-            messages.append(",{\"role\":\"").append(escape(msg.role))
-                    .append("\",\"content\":\"").append(escape(msg.content)).append("\"}");
-        }
-        messages.append("]");
-
-        return "{\"model\":\"" + escape(model) + "\"," +
-               "\"messages\":" + messages + "," +
-               "\"stream\":false}";
-    }
-
-    // -----------------------------------------------------------------------
-    // Ollama lifecycle management (offline fallback)
+    // Ollama lifecycle (offline fallback only)
     // -----------------------------------------------------------------------
 
     /**
-     * Ensures Ollama is installed and running on this machine.
-     *  1. Already running → return immediately.
-     *  2. Installed but stopped → launch "ollama serve".
-     *  3. Not installed → install via winget, then start.
-     *  4. Pull model if not already downloaded.
+     * Ensures Ollama is installed and running — ONLY called when internet is off.
+     *  1. Running → pull model if needed → return.
+     *  2. Installed but stopped → "ollama serve" → wait → pull if needed.
+     *  3. Not installed → winget install → start → pull.
      */
     public static void ensureOllamaRunning(Consumer<String> statusCallback) {
         if (isOllamaAvailable()) {
@@ -388,7 +506,7 @@ public class OllamaService {
 
         notify(statusCallback, "🔍 Ollama not detected — attempting to start...");
 
-        // Step 1: Try starting an existing install
+        // Try starting an existing install first
         try {
             new ProcessBuilder("cmd.exe", "/c", "start /b ollama serve")
                     .redirectErrorStream(true).start();
@@ -396,37 +514,37 @@ public class OllamaService {
         } catch (Exception ignored) {}
 
         if (isOllamaAvailable()) {
-            notify(statusCallback, "✅ Ollama started! Loading model...");
+            notify(statusCallback, "✅ Ollama started!");
             pullModel(statusCallback);
             return;
         }
 
-        // Step 2: Install via winget
+        // Not installed — try winget
         notify(statusCallback, "📦 Installing Ollama via winget (one-time setup)...");
         try {
-            ProcessBuilder installPb = new ProcessBuilder(
+            ProcessBuilder pb = new ProcessBuilder(
                     "cmd.exe", "/c",
                     "winget install Ollama.Ollama -e --accept-package-agreements " +
                     "--accept-source-agreements --silent");
-            installPb.redirectErrorStream(true);
-            Process p = installPb.start();
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
             try (BufferedReader br = new BufferedReader(
                     new InputStreamReader(p.getInputStream()))) {
                 String line;
                 while ((line = br.readLine()) != null) {
-                    final String l = line.trim();
+                    String l = line.trim();
                     if (!l.isEmpty()) notify(statusCallback, "  " + l);
                 }
             }
             p.waitFor();
         } catch (Exception e) {
-            notify(statusCallback, "❌ winget install failed: " + e.getMessage() +
-                    "\nPlease install Ollama manually from https://ollama.com/download");
+            notify(statusCallback,
+                    "❌ winget install failed: " + e.getMessage() +
+                    "\nInstall manually: https://ollama.com/download");
             return;
         }
 
-        // Step 3: Start freshly installed Ollama
-        notify(statusCallback, "🚀 Starting Ollama service...");
+        notify(statusCallback, "🚀 Starting Ollama...");
         try {
             new ProcessBuilder("cmd.exe", "/c", "start /b ollama serve")
                     .redirectErrorStream(true).start();
@@ -434,7 +552,8 @@ public class OllamaService {
         } catch (Exception ignored) {}
 
         if (!isOllamaAvailable()) {
-            notify(statusCallback, "❌ Could not start Ollama after install. Please restart your PC and try again.");
+            notify(statusCallback,
+                    "❌ Could not start Ollama after install. Please restart your PC.");
             return;
         }
 
@@ -442,39 +561,38 @@ public class OllamaService {
         pullModel(statusCallback);
     }
 
-    /** Pulls the configured AI model if not already available. */
     private static void pullModel(Consumer<String> statusCallback) {
-        notify(statusCallback, "⬇️ Downloading model: " + Config.AI_MODEL +
-                " (first-time only, may take a few minutes)...");
+        notify(statusCallback, "⬇️ Downloading " + Config.AI_MODEL +
+                " (first-time only)...");
         try {
-            ProcessBuilder pb = new ProcessBuilder("cmd.exe", "/c",
-                    "ollama pull " + Config.AI_MODEL);
+            ProcessBuilder pb = new ProcessBuilder(
+                    "cmd.exe", "/c", "ollama pull " + Config.AI_MODEL);
             pb.redirectErrorStream(true);
             Process p = pb.start();
             try (BufferedReader br = new BufferedReader(
                     new InputStreamReader(p.getInputStream()))) {
                 String line;
                 while ((line = br.readLine()) != null) {
-                    final String l = line.trim();
+                    String l = line.trim();
                     if (!l.isEmpty()) notify(statusCallback, "  " + l);
                 }
             }
             p.waitFor();
-            notify(statusCallback, "✅ Model ready! Sending your question now...");
+            notify(statusCallback, "✅ Model ready!");
         } catch (Exception e) {
             notify(statusCallback, "⚠️ Could not pull model: " + e.getMessage());
         }
     }
 
     // -----------------------------------------------------------------------
-    // Utility helpers
+    // Utility
     // -----------------------------------------------------------------------
 
     private static List<ChatMessage> getHistory(String studentName) {
         return conversationHistories.computeIfAbsent(studentName, k -> new ArrayList<>());
     }
 
-    /** Keep rolling window to last 20 exchanges (40 messages). */
+    /** Rolling window — keep last 40 messages (20 exchanges). */
     private static void trimHistory(List<ChatMessage> history) {
         while (history.size() > 40) history.remove(0);
     }
@@ -489,20 +607,15 @@ public class OllamaService {
     }
 
     // -----------------------------------------------------------------------
-    // Minimal JSON parsing helpers (no external libraries)
+    // Minimal JSON parsing (stdlib only — no external deps)
     // -----------------------------------------------------------------------
 
-    /**
-     * Extract content from OpenAI-style response:
-     *   {"choices":[{"message":{"role":"assistant","content":"..."}},...]}
-     */
+    /** Parse OpenAI-style: {"choices":[{"message":{"content":"..."}}]} */
     private static String extractOpenAiContent(String json) {
-        // choices[0].message.content
         String choicesKey = "\"choices\":[";
         int ci = json.indexOf(choicesKey);
         if (ci >= 0) {
             String afterChoices = json.substring(ci + choicesKey.length());
-            // Inside the first choice object, find message.content
             String msgKey = "\"message\":{";
             int mi = afterChoices.indexOf(msgKey);
             if (mi >= 0) {
@@ -510,25 +623,21 @@ public class OllamaService {
                 return extractJsonField(insideMsg, "content");
             }
         }
-        // Fallback: try direct content field
         return extractJsonField(json, "content");
     }
 
-    /**
-     * Extracts a nested string value: {"outerKey":{..., "innerKey":"value"...}}
-     */
+    /** Parse nested: {"outerKey":{"innerKey":"value"}} */
     private static String extractNestedField(String json, String outerKey, String innerKey) {
         String search = "\"" + outerKey + "\":{";
-        int outerStart = json.indexOf(search);
-        if (outerStart < 0) return extractJsonField(json, innerKey);
-        String inner = json.substring(outerStart + search.length() - 1);
-        return extractJsonField(inner, innerKey);
+        int start = json.indexOf(search);
+        if (start < 0) return extractJsonField(json, innerKey);
+        return extractJsonField(json.substring(start + search.length() - 1), innerKey);
     }
 
     private static String extractJsonField(String json, String key) {
         String searchKey = "\"" + key + "\":\"";
         int start = json.indexOf(searchKey);
-        if (start < 0) return "(no response from AI — check connection)";
+        if (start < 0) return "(no response — check AI service)";
         int valStart = start + searchKey.length();
         StringBuilder sb = new StringBuilder();
         boolean escaped = false;
@@ -553,7 +662,6 @@ public class OllamaService {
         return sb.toString();
     }
 
-    /** JSON-safe string escaping. */
     private static String escape(String s) {
         return s.replace("\\", "\\\\")
                 .replace("\"", "\\\"")
@@ -563,12 +671,10 @@ public class OllamaService {
     }
 
     // -----------------------------------------------------------------------
-    // Legacy compatibility shim — isAvailable() kept for any callers
+    // Legacy compatibility shims
     // -----------------------------------------------------------------------
 
-    /** @deprecated Use {@link #isOllamaAvailable()} directly. */
+    /** @deprecated Use {@link #isOllamaAvailable()} */
     @Deprecated
-    public static boolean isAvailable() {
-        return isOllamaAvailable();
-    }
+    public static boolean isAvailable() { return isOllamaAvailable(); }
 }
