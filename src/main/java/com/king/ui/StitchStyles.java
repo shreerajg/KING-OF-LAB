@@ -118,18 +118,6 @@ public final class StitchStyles {
                "-fx-border-width: 1px;";
     }
 
-    public static String tonalPanel(String hex, int radiusPx) {
-        return "-fx-background-color: " + hex + ";" +
-               "-fx-background-radius: " + radiusPx + "px;";
-    }
-
-    public static String labelSmMuted() {
-        return "-fx-text-fill: " + rgba(C_TEXT_MAIN, 0.45) + ";" +
-               "-fx-font-size: 9px;" +
-               "-fx-font-weight: 900;" +
-               "-fx-letter-spacing: 0.25em;";
-    }
-
     public static String titleMd() {
         return "-fx-text-fill: " + C_TEXT_MAIN + ";" +
                "-fx-font-size: 14px;" +
