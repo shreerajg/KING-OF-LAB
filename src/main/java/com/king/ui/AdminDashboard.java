@@ -82,27 +82,27 @@ public class AdminDashboard {
     private static boolean isSharingScreen = false;
     private static long startTime = System.currentTimeMillis();
 
-    // Design System Colors - The Command Sentinel Palette (delegated to StitchStyles)
-    public static final String C_SURFACE              = StitchStyles.C_SURFACE;
-    public static final String C_SURFACE_CONTAINER    = StitchStyles.C_SURFACE_CONTAINER;
-    public static final String C_SURFACE_HIGH         = StitchStyles.C_SURFACE_HIGH;
-    public static final String C_SURFACE_HIGHEST      = StitchStyles.C_SURFACE_HIGHEST;
-    public static final String C_SURFACE_LOWEST       = StitchStyles.C_SURFACE_LOWEST;
-    public static final String C_PRIMARY              = StitchStyles.C_PRIMARY;
-    public static final String C_PRIMARY_DIM          = "#00dbe9";
-    public static final String C_PRIMARY_GLASS        = StitchStyles.C_PRIMARY_GLASS;
-    public static final String C_SECONDARY            = "#dcb8ff";
-    public static final String C_SECONDARY_CONTAINER  = StitchStyles.C_SECONDARY_CONTAINER;
-    public static final String C_SUCCESS              = "#7af19c";
-    public static final String C_WARNING              = "#ffc857";
-    public static final String C_DANGER               = "#ffb4ab";
-    public static final String C_ERROR_CONTAINER      = "#ffdad9";
-    public static final String C_TERTIARY_CONTAINER   = "#aaf0ca";
-    public static final String C_TEXT_MAIN            = StitchStyles.C_TEXT_MAIN;
-    public static final String C_TEXT_MUTED           = StitchStyles.C_TEXT_MUTED;
-    public static final String C_ON_PRIMARY_FIXED     = StitchStyles.C_ON_PRIMARY_FIXED;
-    public static final String C_BORDER               = "rgba(255,255,255,0.05)";
-    public static final String C_OUTLINE_VARIANT      = "rgba(59,73,75,0.15)";
+    // Design System Colors - Dynamically linked to StitchStyles
+    public static String C_SURFACE()              { return StitchStyles.C_SURFACE; }
+    public static String C_SURFACE_CONTAINER()    { return StitchStyles.C_SURFACE_CONTAINER; }
+    public static String C_SURFACE_HIGH()         { return StitchStyles.C_SURFACE_HIGH; }
+    public static String C_SURFACE_HIGHEST()      { return StitchStyles.C_SURFACE_HIGHEST; }
+    public static String C_SURFACE_LOWEST()       { return StitchStyles.C_SURFACE_LOWEST; }
+    public static String C_PRIMARY()              { return StitchStyles.C_PRIMARY; }
+    public static String C_PRIMARY_DIM()          { return StitchStyles.C_PRIMARY; } // Use primary as dim fallback
+    public static String C_PRIMARY_GLASS()        { return StitchStyles.C_PRIMARY_GLASS; }
+    public static String C_SECONDARY()            { return StitchStyles.C_SECONDARY_CONTAINER; }
+    public static String C_SECONDARY_CONTAINER()  { return StitchStyles.C_SECONDARY_CONTAINER; }
+    public static String C_SUCCESS              = "#7af19c";
+    public static String C_WARNING              = "#ffc857";
+    public static String C_DANGER               = "#ffb4ab";
+    public static String C_ERROR_CONTAINER      = "#ffdad9";
+    public static String C_TERTIARY_CONTAINER   = "#aaf0ca";
+    public static String C_TEXT_MAIN()            { return StitchStyles.C_TEXT_MAIN; }
+    public static String C_TEXT_MUTED()           { return StitchStyles.C_TEXT_MUTED; }
+    public static String C_ON_PRIMARY_FIXED()     { return StitchStyles.C_ON_PRIMARY_FIXED; }
+    public static String C_BORDER()               { return "rgba(255,255,255,0.05)"; }
+    public static String C_OUTLINE_VARIANT()      { return "rgba(59,73,75,0.15)"; }
 
     public static void show(Stage stage, User user) {
         if (server == null) {
@@ -146,10 +146,10 @@ public class AdminDashboard {
         root.setStyle(StitchStyles.appRoot());
 
         // UI Zones
-        root.setTop(buildTopNavBar(user));
+        root.setTop(buildTopNavBar(user, stage));
 
         HBox body = new HBox(0);
-        body.setStyle("-fx-background-color: " + C_SURFACE + ";");
+        body.setStyle("-fx-background-color: " + C_SURFACE() + ";");
         HBox.setHgrow(body, Priority.ALWAYS);
 
         VBox sideNav = buildSideNavBar(user, stage);
@@ -198,7 +198,7 @@ public class AdminDashboard {
         double w = pulseMonitorCanvas.getWidth();
         double h = pulseMonitorCanvas.getHeight();
         gc.clearRect(0, 0, w, h);
-        gc.setFill(Color.web(C_PRIMARY, 0.1));
+        gc.setFill(Color.web(C_PRIMARY(), 0.1));
         gc.beginPath();
         gc.moveTo(0, h);
         for (int i = 0; i < pulseData.length; i++) {
@@ -210,7 +210,7 @@ public class AdminDashboard {
         gc.lineTo(w, h);
         gc.closePath();
         gc.fill();
-        gc.setStroke(Color.web(C_PRIMARY_GLASS));
+        gc.setStroke(Color.web(C_PRIMARY_GLASS()));
         gc.setLineWidth(1.5);
         gc.beginPath();
         for (int i = 0; i < pulseData.length; i++) {
@@ -225,29 +225,29 @@ public class AdminDashboard {
     // -----------------------------------------------------------------------
     // TOP NAVIGATION (Header)
     // -----------------------------------------------------------------------
-    private static HBox buildTopNavBar(User user) {
+    private static HBox buildTopNavBar(User user, Stage stage) {
         HBox topNav = new HBox(30);
         topNav.setPrefHeight(64);
         topNav.setAlignment(Pos.CENTER_LEFT);
         topNav.setPadding(new Insets(0, 32, 0, 32));
         // "No-Line" rule: avoid divider borders; use tonal shift instead.
-        topNav.setStyle("-fx-background-color: rgba(10, 14, 20, 0.82);");
+        topNav.setStyle("-fx-background-color: " + StitchStyles.rgba(C_SURFACE_LOWEST(), 0.82) + ";");
 
         // Logo
         VBox lBox = new VBox(-4);
         lBox.setAlignment(Pos.CENTER_LEFT);
-        Label l1 = new Label("King of"); l1.setStyle("-fx-text-fill: " + C_PRIMARY + "; -fx-font-size: 18px; -fx-font-weight: bold; -fx-letter-spacing: 0.02em;");
-        Label l2 = new Label("Lab");     l2.setStyle("-fx-text-fill: " + C_PRIMARY + "; -fx-font-size: 18px; -fx-font-weight: bold; -fx-letter-spacing: 0.02em;");
+        Label l1 = new Label("King of"); l1.setStyle("-fx-text-fill: " + C_PRIMARY() + "; -fx-font-size: 18px; -fx-font-weight: bold; -fx-letter-spacing: 0.02em;");
+        Label l2 = new Label("Lab");     l2.setStyle("-fx-text-fill: " + C_PRIMARY() + "; -fx-font-size: 18px; -fx-font-weight: bold; -fx-letter-spacing: 0.02em;");
         lBox.getChildren().addAll(l1, l2);
 
         // Links
         HBox links = new HBox(32);
         links.setAlignment(Pos.CENTER);
         links.setPadding(new Insets(0, 0, 0, 32));
-        Label lStu = new Label("STUDENTS"); lStu.setStyle("-fx-text-fill: " + C_PRIMARY + "; -fx-font-weight: bold; -fx-font-size: 12px; -fx-border-color: " + C_PRIMARY + "; -fx-border-width: 0 0 2 0; -fx-padding: 0 0 6 0; -fx-cursor: hand;");
-        Label lNet = new Label("NETWORK");  lNet.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand;");
-        Label lAi  = new Label("AI STATUS");lAi.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand;");
-        Label lAn  = new Label("ANALYTICS");lAn.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand;");
+        Label lStu = new Label("STUDENTS"); lStu.setStyle("-fx-text-fill: " + C_PRIMARY() + "; -fx-font-weight: bold; -fx-font-size: 12px; -fx-border-color: " + C_PRIMARY() + "; -fx-border-width: 0 0 2 0; -fx-padding: 0 0 6 0; -fx-cursor: hand;");
+        Label lNet = new Label("NETWORK");  lNet.setStyle("-fx-text-fill: " + StitchStyles.rgba(C_TEXT_MAIN(), 0.4) + "; -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand;");
+        Label lAi  = new Label("AI STATUS");lAi.setStyle("-fx-text-fill: " + StitchStyles.rgba(C_TEXT_MAIN(), 0.4) + "; -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand;");
+        Label lAn  = new Label("ANALYTICS");lAn.setStyle("-fx-text-fill: " + StitchStyles.rgba(C_TEXT_MAIN(), 0.4) + "; -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand;");
         links.getChildren().addAll(lStu, lNet, lAi, lAn);
 
         Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -264,17 +264,17 @@ public class AdminDashboard {
         Circle dot = new Circle(3.5, Color.web(C_SUCCESS));
         dot.setEffect(new DropShadow(8, Color.web(C_SUCCESS, 0.8)));
         connectedLabel = new Label("0\nCONNECTED");
-        connectedLabel.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.8); -fx-font-weight: 900; -fx-font-size: 9px; -fx-label-padding: 0 0 0 -5; -fx-line-spacing: -2px; -fx-letter-spacing: 0.1em;");
+        connectedLabel.setStyle("-fx-text-fill: " + StitchStyles.rgba(C_TEXT_MAIN(), 0.8) + "; -fx-font-weight: 900; -fx-font-size: 9px; -fx-label-padding: 0 0 0 -5; -fx-line-spacing: -2px; -fx-letter-spacing: 0.1em;");
         HBox bxConn = new HBox(8, dot, connectedLabel); bxConn.setAlignment(Pos.CENTER_LEFT);
 
-        Label hIcn = new Label("📶"); hIcn.setStyle("-fx-text-fill: " + C_PRIMARY + ";");
+        Label hIcn = new Label("📶"); hIcn.setStyle("-fx-text-fill: " + C_PRIMARY() + ";");
         healthLabel = new Label("HEALTH:\n98%");
-        healthLabel.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.8); -fx-font-weight: 900; -fx-font-size: 9px; -fx-label-padding: 0 0 0 -5; -fx-line-spacing: -2px; -fx-letter-spacing: 0.1em;");
+        healthLabel.setStyle("-fx-text-fill: " + StitchStyles.rgba(C_TEXT_MAIN(), 0.8) + "; -fx-font-weight: 900; -fx-font-size: 9px; -fx-label-padding: 0 0 0 -5; -fx-line-spacing: -2px; -fx-letter-spacing: 0.1em;");
         HBox bxHealth = new HBox(6, hIcn, healthLabel); bxHealth.setAlignment(Pos.CENTER_LEFT);
 
-        Label aIcn = new Label("🧠"); aIcn.setStyle("-fx-text-fill: " + C_SECONDARY + ";");
+        Label aIcn = new Label("🧠"); aIcn.setStyle("-fx-text-fill: " + C_SECONDARY() + ";");
         aiStatusLabel = new Label("AI:\nON");
-        aiStatusLabel.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.8); -fx-font-weight: 900; -fx-font-size: 9px; -fx-line-spacing: -2px; -fx-letter-spacing: 0.1em;");
+        aiStatusLabel.setStyle("-fx-text-fill: " + StitchStyles.rgba(C_TEXT_MAIN(), 0.8) + "; -fx-font-weight: 900; -fx-font-size: 9px; -fx-line-spacing: -2px; -fx-letter-spacing: 0.1em;");
         HBox bxAi = new HBox(6, aIcn, aiStatusLabel); bxAi.setAlignment(Pos.CENTER_LEFT);
 
         healthPill.getChildren().addAll(bxConn, buildVDivider(), bxHealth, buildVDivider(), bxAi);
@@ -286,23 +286,24 @@ public class AdminDashboard {
         pulseMonitorCanvas = new Canvas(80, 24);
         pulseMonitorCanvas.setStyle("-fx-background-color: transparent;");
         StackPane pulseContainer = new StackPane(pulseMonitorCanvas);
-        pulseContainer.setStyle("-fx-background-color: rgba(0,240,255,0.05); -fx-background-radius: 8px; -fx-border-color: rgba(0,240,255,0.1); -fx-border-radius: 8px; -fx-padding: 4;");
+        pulseContainer.setStyle("-fx-background-color: " + StitchStyles.rgba(C_PRIMARY(), 0.05) + "; -fx-background-radius: 8px; -fx-border-color: " + StitchStyles.rgba(C_PRIMARY(), 0.1) + "; -fx-border-radius: 8px; -fx-padding: 4;");
         StackPane.setAlignment(pulseContainer, Pos.CENTER_LEFT);
         StackPane.setMargin(pulseContainer, new Insets(0, 16, 0, 0));
 
-        Button bBell = new Button("🔔"); bBell.setStyle("-fx-background-color: transparent; -fx-text-fill: rgba(223,226,235,0.6); -fx-cursor: hand;");
-        Button bGear = new Button("⚙"); bGear.setStyle("-fx-background-color: transparent; -fx-text-fill: rgba(223,226,235,0.6); -fx-cursor: hand;");
+        Button bBell = new Button("🔔"); bBell.setStyle("-fx-background-color: transparent; -fx-text-fill: " + StitchStyles.rgba(C_TEXT_MAIN(), 0.6) + "; -fx-cursor: hand;");
+        Button bGear = new Button("⚙"); bGear.setStyle("-fx-background-color: transparent; -fx-text-fill: " + StitchStyles.rgba(C_TEXT_MAIN(), 0.6) + "; -fx-cursor: hand;");
+        bGear.setOnAction(e -> showThemeMenu(bGear, stage, user));
 
         VBox adminTxt = new VBox(-1);
         adminTxt.setAlignment(Pos.CENTER_RIGHT);
-        Label p1 = new Label("Admin Panel"); p1.setStyle("-fx-text-fill: #DFE2EB; -fx-font-weight: bold; -fx-font-size: 11px;");
-        Label p2 = new Label("CHIEF OVERSEER"); p2.setStyle("-fx-text-fill: rgba(223,226,235,0.5); -fx-font-weight: 900; -fx-font-size: 8px; -fx-letter-spacing: 0.1em;");
+        Label p1 = new Label("Admin Panel"); p1.setStyle("-fx-text-fill: " + C_TEXT_MAIN() + "; -fx-font-weight: bold; -fx-font-size: 11px;");
+        Label p2 = new Label("CHIEF OVERSEER"); p2.setStyle("-fx-text-fill: " + StitchStyles.rgba(C_TEXT_MAIN(), 0.5) + "; -fx-font-weight: 900; -fx-font-size: 8px; -fx-letter-spacing: 0.1em;");
         adminTxt.getChildren().addAll(p1, p2);
 
         StackPane avatarPane = new StackPane();
         Rectangle avBg = new Rectangle(32, 32);
         avBg.setArcWidth(12); avBg.setArcHeight(12);
-        avBg.setFill(new LinearGradient(0,0,1,1,true,CycleMethod.NO_CYCLE, new Stop(0, Color.web("#00dbe9")), new Stop(1, Color.web("#7701d0"))));
+        avBg.setFill(new LinearGradient(0,0,1,1,true,CycleMethod.NO_CYCLE, new Stop(0, Color.web(C_PRIMARY())), new Stop(1, Color.web(C_SECONDARY()))));
         Label avT = new Label("👤"); avT.setStyle("-fx-text-fill: white; -fx-font-size: 18px;");
         avatarPane.getChildren().addAll(avBg, avT);
 
@@ -310,6 +311,19 @@ public class AdminDashboard {
 
         topNav.getChildren().addAll(lBox, links, spacer, healthPill, profileSection);
         return topNav;
+    }
+
+    private static void showThemeMenu(Button source, Stage stage, User user) {
+        ContextMenu menu = new ContextMenu();
+        for (StitchStyles.Theme t : StitchStyles.Theme.values()) {
+            MenuItem item = new MenuItem(t.name());
+            item.setOnAction(e -> {
+                StitchStyles.applyTheme(t);
+                show(stage, user); // Reload dashboard with new theme
+            });
+            menu.getItems().add(item);
+        }
+        menu.show(source, Side.BOTTOM, 0, 0);
     }
 
     private static Region buildVDivider() {
