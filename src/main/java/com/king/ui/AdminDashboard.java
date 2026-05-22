@@ -101,8 +101,6 @@ public class AdminDashboard {
     public static String C_TEXT_MAIN()            { return StitchStyles.C_TEXT_MAIN; }
     public static String C_TEXT_MUTED()           { return StitchStyles.C_TEXT_MUTED; }
     public static String C_ON_PRIMARY_FIXED()     { return StitchStyles.C_ON_PRIMARY_FIXED; }
-    public static String C_BORDER()               { return "rgba(255,255,255,0.05)"; }
-    public static String C_OUTLINE_VARIANT()      { return "rgba(59,73,75,0.15)"; }
 
     public static void show(Stage stage, User user) {
         if (server == null) {
