@@ -350,15 +350,15 @@ public class AdminDashboard {
         VBox.setMargin(badge, new Insets(30, 24, 40, 24));
         
         StackPane shieldBox = new StackPane();
-        Rectangle sb = new Rectangle(36, 36); sb.setFill(Color.web("rgba(0,240,255,0.1)")); sb.setArcWidth(12); sb.setArcHeight(12);
-        Label sIcon = new Label("🛡"); sIcon.setStyle("-fx-text-fill: " + C_PRIMARY + "; -fx-font-size: 18px;");
+        Rectangle sb = new Rectangle(36, 36); sb.setFill(Color.web(StitchStyles.rgba(C_PRIMARY(), 0.1))); sb.setArcWidth(12); sb.setArcHeight(12);
+        Label sIcon = new Label("🛡"); sIcon.setStyle("-fx-text-fill: " + C_PRIMARY() + "; -fx-font-size: 18px;");
         shieldBox.getChildren().addAll(sb, sIcon);
 
         VBox sInfo = new VBox(1);
         Label sTitle = new Label("COMMAND\nSENTINEL");
-        sTitle.setStyle("-fx-text-fill: " + C_PRIMARY + "; -fx-font-size: 10px; -fx-font-weight: 900; -fx-line-spacing: -2px; -fx-letter-spacing: 0.1em;");
+        sTitle.setStyle("-fx-text-fill: " + C_PRIMARY() + "; -fx-font-size: 10px; -fx-font-weight: 900; -fx-line-spacing: -2px; -fx-letter-spacing: 0.1em;");
         sessionInfoLabel = new Label("Session: 00h 00m");
-        sessionInfoLabel.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-size: 10px;");
+        sessionInfoLabel.setStyle("-fx-text-fill: " + StitchStyles.rgba(C_TEXT_MAIN(), 0.4) + "; -fx-font-size: 10px;");
         sInfo.getChildren().addAll(sTitle, sessionInfoLabel);
         badge.getChildren().addAll(shieldBox, sInfo);
 
@@ -412,13 +412,13 @@ public class AdminDashboard {
             StitchStyles.gradientPrimaryCta(12) +
             "-fx-font-size: 11px;" +
             "-fx-padding: 16 0 16 0;" +
-            "-fx-effect: dropshadow(gaussian, rgba(0, 240, 255, 0.22), 26, 0, 0, 6);"
+            "-fx-effect: dropshadow(gaussian, " + StitchStyles.rgba(C_PRIMARY(), 0.22) + ", 26, 0, 0, 6);"
         );
         broadcastBtn.setOnAction(e -> promptGlobalMessage());
 
         HBox terminalLogLinks = new HBox(16);
-        Label tLink = new Label("📺 TERMINAL"); tLink.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-size: 9px; -fx-font-weight: 900; -fx-cursor: hand;");
-        Label lLink = new Label("🕒 LOGS"); lLink.setStyle("-fx-text-fill: rgba(223, 226, 235, 0.4); -fx-font-size: 9px; -fx-font-weight: 900; -fx-cursor: hand;");
+        Label tLink = new Label("📺 TERMINAL"); tLink.setStyle("-fx-text-fill: " + StitchStyles.rgba(C_TEXT_MAIN(), 0.4) + "; -fx-font-size: 9px; -fx-font-weight: 900; -fx-cursor: hand;");
+        Label lLink = new Label("🕒 LOGS"); lLink.setStyle("-fx-text-fill: " + StitchStyles.rgba(C_TEXT_MAIN(), 0.4) + "; -fx-font-size: 9px; -fx-font-weight: 900; -fx-cursor: hand;");
         terminalLogLinks.getChildren().addAll(tLink, lLink);
         
         bottomActions.getChildren().addAll(broadcastBtn, terminalLogLinks);
@@ -428,9 +428,9 @@ public class AdminDashboard {
     }
 
     private static Button buildSideAction(String icon, String text, boolean active) {
-        String baseColor = active ? C_PRIMARY : "rgba(223, 226, 235, 0.5)";
-        String bg = active ? "rgba(0, 240, 255, 0.05)" : "transparent";
-        String border = active ? "rgba(0, 240, 255, 0.1)" : "transparent";
+        String baseColor = active ? C_PRIMARY() : StitchStyles.rgba(C_TEXT_MAIN(), 0.5);
+        String bg = active ? StitchStyles.rgba(C_PRIMARY(), 0.05) : "transparent";
+        String border = active ? StitchStyles.rgba(C_PRIMARY(), 0.1) : "transparent";
 
         Button btn = new Button(icon + "   " + text);
         btn.setMaxWidth(Double.MAX_VALUE);
