@@ -20,4 +20,4 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo [King of Lab] Compilation successful! Starting application...
-java --module-path "lib" --add-modules javafx.controls,javafx.fxml,javafx.graphics -cp "out;lib\*" com.ghost.Main
+java --module-path "lib" --add-modules javafx.controls,javafx.fxml,javafx.graphics -cp "out;lib\*" com.king.Main

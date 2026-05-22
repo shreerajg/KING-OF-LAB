@@ -450,7 +450,7 @@ public class AdminDashboard {
     // -----------------------------------------------------------------------
     private static VBox buildMainCanvas(Stage stage, User admin) {
         VBox mainCanvas = new VBox(0);
-        mainCanvas.setStyle("-fx-background-color: " + C_SURFACE + ";");
+        mainCanvas.setStyle("-fx-background-color: " + C_SURFACE() + ";");
 
         // Command Ribbon
         HBox ribbon = new HBox(40);
@@ -508,7 +508,7 @@ public class AdminDashboard {
         srchFld.setStyle(
             "-fx-background-color: rgba(10,14,20,0.55);" +
             "-fx-background-radius: 12px;" +
-            "-fx-text-fill: " + C_TEXT_MAIN + ";" +
+            "-fx-text-fill: " + C_TEXT_MAIN() + ";" +
             "-fx-prompt-text-fill: rgba(223,226,235,0.28);" +
             "-fx-pref-width: 220;" +
             "-fx-padding: 10 16;" +
@@ -541,7 +541,7 @@ public class AdminDashboard {
         if (active) {
             btn.setStyle("-fx-background-color: " + C_PRIMARY_DIM() + "; -fx-text-fill: #002022; -fx-font-weight: 900; -fx-font-size: 11px; -fx-padding: 8 24; -fx-background-radius: 8px; -fx-cursor: hand;");
         } else {
-            btn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + C_TEXT_MUTED + "; -fx-font-weight: bold; -fx-font-size: 11px; -fx-padding: 8 24; -fx-background-radius: 8px; -fx-cursor: hand;");
+            btn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + C_TEXT_MUTED() + "; -fx-font-weight: bold; -fx-font-size: 11px; -fx-padding: 8 24; -fx-background-radius: 8px; -fx-cursor: hand;");
             btn.setOnMouseEntered(e -> btn.setStyle(btn.getStyle().replace("transparent", "rgba(255,255,255,0.05)").replace(C_TEXT_MUTED, C_TEXT_MAIN)));
             btn.setOnMouseExited(e -> btn.setStyle(btn.getStyle().replace("rgba(255,255,255,0.05)", "transparent").replace(C_TEXT_MAIN, C_TEXT_MUTED)));
         }
@@ -618,12 +618,12 @@ public class AdminDashboard {
         // PC-03 Support Needed overlay
         VBox supportOverlay = new VBox(12); supportOverlay.setAlignment(Pos.CENTER);
         supportOverlay.setStyle("-fx-background-color: rgba(119, 1, 208, 0.2);"); supportOverlay.setVisible(false);
-        HBox alertBox = new HBox(8); alertBox.setStyle("-fx-background-color: " + C_SURFACE + "; -fx-border-color: " + C_SECONDARY + "; -fx-border-radius: 12px; -fx-background-radius: 12px; -fx-padding: 8 16;");
-        Label alI = new Label("✋"); alI.setStyle("-fx-text-fill: " + C_SECONDARY + ";");
+        HBox alertBox = new HBox(8); alertBox.setStyle("-fx-background-color: " + C_SURFACE() + "; -fx-border-color: " + C_SECONDARY() + "; -fx-border-radius: 12px; -fx-background-radius: 12px; -fx-padding: 8 16;");
+        Label alI = new Label("✋"); alI.setStyle("-fx-text-fill: " + C_SECONDARY() + ";");
         Label alT = new Label("SUPPORT NEEDED"); alT.setStyle("-fx-text-fill: white; -fx-font-weight: 900; -fx-font-size: 9px; -fx-letter-spacing: 0.15em;");
         alertBox.getChildren().addAll(alI, alT); alertBox.setAlignment(Pos.CENTER);
         Button respBtn = new Button("RESPOND NOW");
-        respBtn.setStyle("-fx-background-color: " + C_SECONDARY + "; -fx-text-fill: #2c0051; -fx-font-weight: 900; -fx-font-size: 9px; -fx-padding: 8 20; -fx-background-radius: 8px; -fx-cursor: hand;");
+        respBtn.setStyle("-fx-background-color: " + C_SECONDARY() + "; -fx-text-fill: #2c0051; -fx-font-weight: 900; -fx-font-size: 9px; -fx-padding: 8 20; -fx-background-radius: 8px; -fx-cursor: hand;");
         respBtn.setOnAction(e -> { supportOverlay.setVisible(false); promptMessage(name); });
         supportOverlay.getChildren().addAll(alertBox, respBtn);
         handRaisedLabels.put(name, alT); // store reference to trigger alert
@@ -824,7 +824,7 @@ public class AdminDashboard {
                 imgTop.getChildren().get(1).setVisible(up);
             }
         }
-        if (up) appendActivity("INCIDENT", "Support requested at " + student, C_SECONDARY);
+        if (up) appendActivity("INCIDENT", "Support requested at " + student, C_SECONDARY());
     }
 
     private static void startSessionTimer() {
