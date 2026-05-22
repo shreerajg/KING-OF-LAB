@@ -539,7 +539,7 @@ public class AdminDashboard {
     private static Button ribbonPillBtn(String text, boolean active) {
         Button btn = new Button(text);
         if (active) {
-            btn.setStyle("-fx-background-color: " + C_PRIMARY()_DIM + "; -fx-text-fill: #002022; -fx-font-weight: 900; -fx-font-size: 11px; -fx-padding: 8 24; -fx-background-radius: 8px; -fx-cursor: hand;");
+            btn.setStyle("-fx-background-color: " + C_PRIMARY_DIM() + "; -fx-text-fill: #002022; -fx-font-weight: 900; -fx-font-size: 11px; -fx-padding: 8 24; -fx-background-radius: 8px; -fx-cursor: hand;");
         } else {
             btn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + C_TEXT_MUTED + "; -fx-font-weight: bold; -fx-font-size: 11px; -fx-padding: 8 24; -fx-background-radius: 8px; -fx-cursor: hand;");
             btn.setOnMouseEntered(e -> btn.setStyle(btn.getStyle().replace("transparent", "rgba(255,255,255,0.05)").replace(C_TEXT_MUTED, C_TEXT_MAIN)));
