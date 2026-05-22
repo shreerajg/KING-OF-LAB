@@ -31,7 +31,7 @@ public class LoginView {
         root.setStyle(
                 StitchStyles.appRoot() +
                 "-fx-background-color: radial-gradient(radius 120%, " + StitchStyles.rgba(StitchStyles.C_PRIMARY, 0.12) + " 0%, " +
-                StitchStyles.C_SURFACE + " 55%, #070a0f 100%);"
+                StitchStyles.C_SURFACE + " 55%, " + StitchStyles.C_SURFACE_LOWEST + " 100%);"
         );
 
         // Decorative circle backdrop
@@ -101,6 +101,16 @@ public class LoginView {
                 "-fx-underline: true;" +
                 "-fx-cursor: hand;");
 
+        // Theme Switcher for testing
+        ComboBox<StitchStyles.Theme> themePicker = new ComboBox<>();
+        themePicker.getItems().addAll(StitchStyles.Theme.values());
+        themePicker.setValue(StitchStyles.getCurrentTheme());
+        themePicker.setStyle("-fx-background-color: rgba(255,255,255,0.05); -fx-text-fill: white; -fx-font-size: 10px;");
+        themePicker.setOnAction(e -> {
+            StitchStyles.applyTheme(themePicker.getValue());
+            show(stage);
+        });
+
         // Keyboard nav
         userField.setOnAction(e -> passField.requestFocus());
         passField.setOnAction(e -> loginBtn.fire());
@@ -132,11 +142,11 @@ public class LoginView {
         });
 
         card.getChildren().addAll(crown, title, subtitle, sep,
-                userField, passField, loginBtn, statusLbl, registerBtn);
+                userField, passField, loginBtn, statusLbl, registerBtn, themePicker);
 
         root.getChildren().addAll(glow, card);
 
-        Scene scene = new Scene(root, 500, 580);
+        Scene scene = new Scene(root, 500, 620);
         stage.setScene(scene);
         stage.setTitle("👑 King of Lab — Login");
         stage.setResizable(false);
