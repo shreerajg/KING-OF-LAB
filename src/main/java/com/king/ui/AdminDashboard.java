@@ -88,9 +88,9 @@ public class AdminDashboard {
     public static String C_SURFACE_HIGH()         { return StitchStyles.C_SURFACE_HIGH; }
     public static String C_SURFACE_HIGHEST()      { return StitchStyles.C_SURFACE_HIGHEST; }
     public static String C_SURFACE_LOWEST()       { return StitchStyles.C_SURFACE_LOWEST; }
-    public static String C_PRIMARY()              { return StitchStyles.C_PRIMARY(); }
-    public static String C_PRIMARY()_DIM()          { return StitchStyles.C_PRIMARY(); } // Use primary as dim fallback
-    public static String C_PRIMARY_GLASS()        { return StitchStyles.C_PRIMARY()_GLASS; }
+    public static String C_PRIMARY()              { return StitchStyles.C_PRIMARY; }
+    public static String C_PRIMARY_DIM()          { return StitchStyles.C_PRIMARY; } // Use primary as dim fallback
+    public static String C_PRIMARY_GLASS()        { return StitchStyles.C_PRIMARY_GLASS; }
     public static String C_SECONDARY()            { return StitchStyles.C_SECONDARY_CONTAINER; }
     public static String C_SECONDARY_CONTAINER()  { return StitchStyles.C_SECONDARY_CONTAINER; }
     public static String C_SUCCESS              = "#7af19c";
